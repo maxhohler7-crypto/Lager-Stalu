@@ -4,27 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LagerManager</title>
-
-    <!-- PWA Meta Tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="LagerApp">
-
-    <!-- Tailwind CSS, Supabase JS & Lucide Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans antialiased min-h-screen">
+<body class="bg-gray-100 text-gray-900 font-sans min-h-screen">
 
-    <!-- Supabase Konfiguration -->
     <script>
         const SUPABASE_URL = 'https://rcyxndcehfqrsngbmbpy.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_GQykkrMBRLmtWb8qPZVW9w_875r7bAz';
         const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     </script>
 
-    <!-- Anmelde-Bildschirm -->
+    <!-- Login & Registrierung -->
     <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full space-y-6 text-center">
             <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
@@ -32,18 +24,25 @@
             </div>
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">LagerManager</h1>
-                <p class="text-xs text-gray-500 mt-1">Geben Sie Ihre E-Mail-Adresse ein</p>
+                <p class="text-xs text-gray-500 mt-1">Anmeldung mit E-Mail & Passwort</p>
             </div>
-            <form onsubmit="loginWithEmail(event)" class="space-y-4">
-                <input type="email" id="email-input" placeholder="name@firma.de" required class="w-full px-4 py-3 rounded-xl bg-gray-100 border-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-md transition-all text-sm">
-                    Link zum Anmelden senden
-                </button>
+            <form onsubmit="handleAuth(event)" class="space-y-3">
+                <input type="email" id="email-input" placeholder="E-Mail Adresse" required class="w-full px-4 py-3 rounded-xl bg-gray-100 border-none text-sm focus:ring-2 focus:ring-blue-500">
+                <input type="password" id="password-input" placeholder="Passwort" required class="w-full px-4 py-3 rounded-xl bg-gray-100 border-none text-sm focus:ring-2 focus:ring-blue-500">
+                
+                <div class="pt-2 space-y-2">
+                    <button type="submit" id="login-btn" onclick="authMode = 'login'" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-md text-sm">
+                        Anmelden
+                    </button>
+                    <button type="submit" id="signup-btn" onclick="authMode = 'signup'" class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm">
+                        Neues Konto erstellen
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 
-    <!-- Haupt-App (wird nach Login sichtbar) -->
+    <!-- Haupt-App -->
     <div id="app-screen" class="hidden max-w-md mx-auto min-h-screen flex flex-col pb-20">
         <header class="bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between sticky top-0 z-10">
             <div>
@@ -73,8 +72,8 @@
                 <button onclick="closeModal()" class="text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div class="space-y-3">
-                <input type="text" id="prod-name" placeholder="Produktname" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm border-none focus:ring-2 focus:ring-blue-500">
-                <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm border-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="prod-name" placeholder="Produktname" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
+                <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="flex space-x-2 pt-2">
                 <button onclick="closeModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-medium text-sm">Abbrechen</button>
@@ -85,21 +84,16 @@
 
     <script>
         let allProducts = [];
+        let authMode = 'login';
 
         window.onload = async () => {
             lucide.createIcons();
-            
             const { data: { session } } = await db.auth.getSession();
-            if (session) {
-                showApp(session.user);
-            }
+            if (session) showApp(session.user);
 
             db.auth.onAuthStateChange((_event, session) => {
-                if (session) {
-                    showApp(session.user);
-                } else {
-                    showAuth();
-                }
+                if (session) showApp(session.user);
+                else showAuth();
             });
         };
 
@@ -115,21 +109,18 @@
             document.getElementById('app-screen').classList.add('hidden');
         }
 
-        async function loginWithEmail(event) {
+        async function handleAuth(event) {
             event.preventDefault();
             const email = document.getElementById('email-input').value.trim();
+            const password = document.getElementById('password-input').value;
 
-            if (!email) return;
-
-            const { error } = await db.auth.signInWithOtp({ 
-                email: email,
-                options: { emailRedirectTo: window.location.href }
-            });
-
-            if (error) {
-                alert("Fehler: " + error.message);
+            if (authMode === 'signup') {
+                const { error } = await db.auth.signUp({ email, password });
+                if (error) alert("Registrierungsfehler: " + error.message);
+                else alert("Konto erfolgreich erstellt! Du kannst dich jetzt anmelden.");
             } else {
-                alert("Anmeldelink wurde an " + email + " gesendet! Bitte prüfe dein Postfach.");
+                const { error } = await db.auth.signInWithPassword({ email, password });
+                if (error) alert("Anmeldefehler: " + error.message);
             }
         }
 
@@ -140,17 +131,13 @@
 
         async function fetchProducts() {
             const { data, error } = await db.from('products').select('*');
-            if (error) {
-                console.error(error);
-                return;
-            }
+            if (error) return console.error(error);
             allProducts = data || [];
             renderProducts();
         }
 
         function renderProducts() {
             const list = document.getElementById('product-list');
-            
             if (allProducts.length === 0) {
                 list.innerHTML = `<div class="text-center text-gray-400 py-10 text-sm">Keine Produkte vorhanden.</div>`;
                 return;
@@ -160,11 +147,11 @@
                 <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
                     <div>
                         <h4 class="font-semibold text-gray-900 text-sm">${p.name}</h4>
-                        <p class="text-xs text-gray-500">Bestand: ${p.stock ?? p.quantity ?? 0}</p>
+                        <p class="text-xs text-gray-500">Bestand: ${p.stock ?? 0}</p>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <button onclick="updateStock('${p.id}', ${(p.stock ?? p.quantity ?? 0) - 1})" class="w-8 h-8 rounded-lg bg-gray-100 font-bold text-lg">-</button>
-                        <button onclick="updateStock('${p.id}', ${(p.stock ?? p.quantity ?? 0) + 1})" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 font-bold text-lg">+</button>
+                        <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-lg bg-gray-100 font-bold text-lg">-</button>
+                        <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 font-bold text-lg">+</button>
                     </div>
                 </div>
             `).join('');
@@ -174,15 +161,8 @@
 
         async function updateStock(id, newStock) {
             if (newStock < 0) return;
-            
             const { error } = await db.from('products').update({ stock: newStock }).eq('id', id);
-            if (!error) {
-                fetchProducts();
-            } else {
-                // Falls die Spalte 'quantity' heißt:
-                await db.from('products').update({ quantity: newStock }).eq('id', id);
-                fetchProducts();
-            }
+            if (!error) fetchProducts();
         }
 
         function openModal() {
@@ -202,10 +182,8 @@
             if (!name) return alert("Bitte Name eingeben.");
 
             const { error } = await db.from('products').insert([{ name, stock }]);
-            
-            if (error) {
-                alert("Fehler beim Speichern: " + error.message);
-            } else {
+            if (error) alert("Fehler: " + error.message);
+            else {
                 closeModal();
                 fetchProducts();
             }
