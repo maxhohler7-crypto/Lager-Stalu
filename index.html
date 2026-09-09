@@ -9,7 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* Sanftere Übergänge & Apfeleigene Systemschriftarten */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-font-smoothing: antialiased;
@@ -59,7 +58,7 @@
                     <i data-lucide="chevron-left" class="w-5 h-5"></i>
                 </button>
                 <div>
-                    <h2 id="header-title" class="text-xl font-bold tracking-tight text-gray-900">Kisten</h2>
+                    <h2 id="header-title" class="text-xl font-bold tracking-tight text-gray-900">Lager</h2>
                     <p id="user-email" class="text-[11px] font-medium text-gray-400"></p>
                 </div>
             </div>
@@ -81,10 +80,26 @@
             <span id="low-stock-text" class="font-medium">Achtung: Einige Produkte haben einen niedrigen Bestand ($\le 5$)!</span>
         </div>
 
-        <!-- Hauptinhalt -->
+        <!-- Hauptinhalt (Wechselt je nach Tab) -->
         <main class="p-4 flex-1 space-y-3" id="content-list">
-            <div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Lagerdaten...</div>
+            <div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Daten...</div>
         </main>
+
+        <!-- Untere Navigationsleiste (Apple-Style Bottom Bar) -->
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-xl border-t border-gray-200/60 py-2.5 px-6 flex justify-around items-center z-30">
+            <button id="tab-lager" onclick="switchTab('lager')" class="flex flex-col items-center text-blue-600 transition-all active:scale-95">
+                <i data-lucide="box" class="w-6 h-6"></i>
+                <span class="text-[10px] font-semibold mt-1">Lager</span>
+            </button>
+            <button id="tab-verlauf" onclick="switchTab('verlauf')" class="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95">
+                <i data-lucide="history" class="w-6 h-6"></i>
+                <span class="text-[10px] font-semibold mt-1">Verlauf</span>
+            </button>
+            <button id="tab-mitarbeiter" onclick="switchTab('mitarbeiter')" class="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95">
+                <i data-lucide="users" class="w-6 h-6"></i>
+                <span class="text-[10px] font-semibold mt-1">Mitarbeiter</span>
+            </button>
+        </nav>
     </div>
 
     <!-- Modal im Apple-Stil -->
@@ -108,6 +123,8 @@
         let allProducts = [];
         let authMode = 'login';
         let activeBox = null;
+        let currentTab = 'lager';
+        let currentUser = null;
 
         window.onload = async () => {
             lucide.createIcons();
@@ -121,10 +138,19 @@
         };
 
         function showApp(user) {
+            currentUser = user;
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('app-screen').classList.remove('hidden');
             document.getElementById('user-email').innerText = user.email;
-            fetchProducts();
+            
+            // Profil in profiles Tabelle sicherstellen
+            ensureUserProfile(user);
+
+            switchTab('lager');
+        }
+
+        async function ensureUserProfile(user) {
+            await db.from('profiles').upsert({ id: user.id, email: user.email });
         }
 
         function showAuth() {
@@ -138,9 +164,12 @@
             const password = document.getElementById('password-input').value;
 
             if (authMode === 'signup') {
-                const { error } = await db.auth.signUp({ email, password });
+                const { data, error } = await db.auth.signUp({ email, password });
                 if (error) alert("Registrierungsfehler: " + error.message);
-                else alert("Konto erfolgreich erstellt!");
+                else {
+                    if(data.user) ensureUserProfile(data.user);
+                    alert("Konto erfolgreich erstellt!");
+                }
             } else {
                 const { error } = await db.auth.signInWithPassword({ email, password });
                 if (error) alert("Anmeldefehler: " + error.message);
@@ -152,6 +181,39 @@
             location.reload();
         }
 
+        // Tab Navigation
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Tab Buttons stylen
+            ['lager', 'verlauf', 'mitarbeiter'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                if (t === tab) {
+                    btn.className = "flex flex-col items-center text-blue-600 transition-all active:scale-95";
+                } else {
+                    btn.className = "flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95";
+                }
+            });
+
+            const addBtn = document.getElementById('add-btn');
+
+            if (tab === 'lager') {
+                addBtn.classList.remove('hidden');
+                fetchProducts();
+            } else if (tab === 'verlauf') {
+                addBtn.classList.add('hidden');
+                document.getElementById('back-btn').classList.add('hidden');
+                document.getElementById('header-title').innerText = "Verlauf";
+                renderActivityLog();
+            } else if (tab === 'mitarbeiter') {
+                addBtn.classList.add('hidden');
+                document.getElementById('back-btn').classList.add('hidden');
+                document.getElementById('header-title').innerText = "Mitarbeiter";
+                renderEmployees();
+            }
+        }
+
+        // --- LAGER TAB ---
         async function fetchProducts() {
             const { data, error } = await db.from('products').select('*');
             if (error) return console.error(error);
@@ -169,7 +231,7 @@
         function checkLowStockGlobal() {
             const lowItems = allProducts.filter(p => (p.stock ?? 0) <= 5);
             const banner = document.getElementById('low-stock-banner');
-            if (lowItems.length > 0) {
+            if (lowItems.length > 0 && currentTab === 'lager') {
                 banner.classList.remove('hidden');
                 document.getElementById('low-stock-text').innerText = 
                     `${lowItems.length} Artikel haben einen niedrigen Bestand ($\le 5$)!`;
@@ -249,8 +311,8 @@
                             <p class="text-xs text-gray-400 font-medium mt-0.5">Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span></p>
                         </div>
                         <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
-                            <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
-                            <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
+                            <button onclick="updateStock('${p.id}', '${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
+                            <button onclick="updateStock('${p.id}', '${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
                         </div>
                     </div>
                 `;
@@ -259,12 +321,94 @@
             lucide.createIcons();
         }
 
-        async function updateStock(id, newStock) {
+        async function updateStock(id, prodName, newStock) {
             if (newStock < 0) return;
             const { error } = await db.from('products').update({ stock: newStock }).eq('id', id);
-            if (!error) fetchProducts();
+            if (!error) {
+                logActivity(`hat Bestandsänderung für "${prodName}" auf ${newStock} vorgenommen`);
+                fetchProducts();
+            }
         }
 
+        // --- VERLAUF TAB ---
+        async function logActivity(actionText) {
+            if (!currentUser) return;
+            await db.from('activity_log').insert([{
+                user_email: currentUser.email,
+                action: actionText
+            }]);
+        }
+
+        async function renderActivityLog() {
+            document.getElementById('low-stock-banner').classList.add('hidden');
+            const list = document.getElementById('content-list');
+            list.innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Verlauf...</div>`;
+
+            const { data, error } = await db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(30);
+
+            if (error || !data || data.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Noch keine Aktivitäten vorhanden.</div>`;
+                return;
+            }
+
+            list.innerHTML = data.map(item => {
+                const date = new Date(item.created_at).toLocaleString('de-DE', {
+                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                });
+                return `
+                    <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-start space-x-3">
+                        <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                            <i data-lucide="clock" class="w-5 h-5"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-bold text-gray-900">${item.user_email}</span>
+                                <span class="text-[10px] text-gray-400 font-medium">${date}</span>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1 font-medium">${item.action}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // --- MITARBEITER TAB ---
+        async function renderEmployees() {
+            document.getElementById('low-stock-banner').classList.add('hidden');
+            const list = document.getElementById('content-list');
+            list.innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Mitarbeiter...</div>`;
+
+            const { data, error } = await db.from('profiles').select('*').order('created_at', { ascending: false });
+
+            if (error || !data || data.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Keine Mitarbeiter gefunden.</div>`;
+                return;
+            }
+
+            list.innerHTML = data.map(emp => {
+                const date = new Date(emp.created_at).toLocaleDateString('de-DE');
+                return `
+                    <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between">
+                        <div class="flex items-center space-x-3.5">
+                            <div class="w-11 h-11 rounded-2xl bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-sm">
+                                ${emp.email.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-gray-900 text-sm">${emp.email}</h4>
+                                <p class="text-xs text-gray-400 font-medium">Registriert seit ${date}</p>
+                            </div>
+                        </div>
+                        <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full" title="Aktiv"></span>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // --- MODAL DIALOGE ---
         function openAddModal() {
             const inputs = document.getElementById('modal-inputs');
             if (activeBox) {
@@ -306,6 +450,7 @@
             if (error) {
                 alert("Fehler beim Speichern: " + error.message);
             } else {
+                logActivity(`hat das Produkt "${name}" in Kiste "${category}" erstellt (Bestand: ${stock})`);
                 closeModal();
                 fetchProducts();
             }
