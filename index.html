@@ -20,7 +20,7 @@
     <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full space-y-6 text-center">
             <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto">
-                <i data-lucide="box" class="w-8 h-8"></i>
+                <i data-lucide="archive" class="w-8 h-8"></i>
             </div>
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">LagerManager</h1>
@@ -31,10 +31,10 @@
                 <input type="password" id="password-input" placeholder="Passwort" required class="w-full px-4 py-3 rounded-xl bg-gray-100 border-none text-sm focus:ring-2 focus:ring-blue-500">
                 
                 <div class="pt-2 space-y-2">
-                    <button type="submit" id="login-btn" onclick="authMode = 'login'" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-md text-sm">
+                    <button type="submit" onclick="authMode = 'login'" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-md text-sm">
                         Anmelden
                     </button>
-                    <button type="submit" id="signup-btn" onclick="authMode = 'signup'" class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm">
+                    <button type="submit" onclick="authMode = 'signup'" class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm">
                         Neues Konto erstellen
                     </button>
                 </div>
@@ -44,13 +44,19 @@
 
     <!-- Haupt-App -->
     <div id="app-screen" class="hidden max-w-md mx-auto min-h-screen flex flex-col pb-20">
+        <!-- Header -->
         <header class="bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between sticky top-0 z-10">
-            <div>
-                <h2 class="text-lg font-bold text-gray-900">Lagerbestand</h2>
-                <p id="user-email" class="text-xs text-gray-400"></p>
+            <div class="flex items-center space-x-2">
+                <button id="back-btn" onclick="showBoxOverview()" class="hidden w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center mr-1">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                </button>
+                <div>
+                    <h2 id="header-title" class="text-lg font-bold text-gray-900">Kisten Übersicht</h2>
+                    <p id="user-email" class="text-xs text-gray-400"></p>
+                </div>
             </div>
             <div class="flex items-center space-x-2">
-                <button onclick="openModal()" class="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md">
+                <button id="add-btn" onclick="openAddModal()" class="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md">
                     <i data-lucide="plus" class="w-5 h-5"></i>
                 </button>
                 <button onclick="logout()" class="w-10 h-10 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center">
@@ -59,25 +65,31 @@
             </div>
         </header>
 
-        <main class="p-5 flex-1 space-y-3" id="product-list">
-            <div class="text-center text-gray-400 py-10 text-sm">Produkte werden geladen...</div>
+        <!-- Warnbanner für niedrigen Bestand -->
+        <div id="low-stock-banner" class="hidden p-4 bg-amber-50 border-b border-amber-200 text-amber-800 text-xs flex items-center space-x-2">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0"></i>
+            <span id="low-stock-text">Achtung: Einige Produkte haben einen Bestand von 5 oder weniger!</span>
+        </div>
+
+        <!-- Hauptinhalt -->
+        <main class="p-5 flex-1 space-y-3" id="content-list">
+            <div class="text-center text-gray-400 py-10 text-sm">Wird geladen...</div>
         </main>
     </div>
 
-    <!-- Modal für neues Produkt -->
-    <div id="product-modal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center p-4 z-50">
+    <!-- Modal für Kiste / Produkt hinzufügen -->
+    <div id="add-modal" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
-                <h3 class="text-base font-bold text-gray-900">Neues Produkt</h3>
+                <h3 id="modal-title" class="text-base font-bold text-gray-900">Neue Kiste</h3>
                 <button onclick="closeModal()" class="text-gray-400"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <div class="space-y-3">
-                <input type="text" id="prod-name" placeholder="Produktname" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
-                <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
+            <div class="space-y-3" id="modal-inputs">
+                <!-- Dynamische Eingabefelder -->
             </div>
             <div class="flex space-x-2 pt-2">
                 <button onclick="closeModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-medium text-sm">Abbrechen</button>
-                <button onclick="saveProduct()" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm">Speichern</button>
+                <button onclick="submitModal()" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm">Speichern</button>
             </div>
         </div>
     </div>
@@ -85,6 +97,7 @@
     <script>
         let allProducts = [];
         let authMode = 'login';
+        let activeBox = null; // Null = Kistenansicht, Sonst Name der Kiste
 
         window.onload = async () => {
             lucide.createIcons();
@@ -117,7 +130,7 @@
             if (authMode === 'signup') {
                 const { error } = await db.auth.signUp({ email, password });
                 if (error) alert("Registrierungsfehler: " + error.message);
-                else alert("Konto erfolgreich erstellt! Du kannst dich jetzt anmelden.");
+                else alert("Konto erfolgreich erstellt!");
             } else {
                 const { error } = await db.auth.signInWithPassword({ email, password });
                 if (error) alert("Anmeldefehler: " + error.message);
@@ -133,28 +146,110 @@
             const { data, error } = await db.from('products').select('*');
             if (error) return console.error(error);
             allProducts = data || [];
-            renderProducts();
+            
+            checkLowStockGlobal();
+
+            if (activeBox) {
+                renderProductsInBox(activeBox);
+            } else {
+                renderBoxes();
+            }
         }
 
-        function renderProducts() {
-            const list = document.getElementById('product-list');
-            if (allProducts.length === 0) {
-                list.innerHTML = `<div class="text-center text-gray-400 py-10 text-sm">Keine Produkte vorhanden.</div>`;
+        // Weltweite Warnung prüfen (Bestand <= 5)
+        function checkLowStockGlobal() {
+            const lowItems = allProducts.filter(p => (p.stock ?? 0) <= 5);
+            const banner = document.getElementById('low-stock-banner');
+            if (lowItems.length > 0) {
+                banner.classList.remove('hidden');
+                document.getElementById('low-stock-text').innerText = 
+                    `Achtung: ${lowItems.length} Artikel haben einen Bestand von 5 oder weniger!`;
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        // Kisten-Übersicht rendern
+        function renderBoxes() {
+            activeBox = null;
+            document.getElementById('header-title').innerText = "Kisten Übersicht";
+            document.getElementById('back-btn').classList.add('hidden');
+            
+            const list = document.getElementById('content-list');
+            
+            // Einzigartige Kisten/Gruppen ermitteln
+            const boxes = [...new Set(allProducts.map(p => p.category || 'Allgemein'))];
+
+            if (boxes.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-10 text-sm">Noch keine Kisten angelegt. Tippe auf "+", um eine Kiste zu erstellen.</div>`;
                 return;
             }
 
-            list.innerHTML = allProducts.map(p => `
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <h4 class="font-semibold text-gray-900 text-sm">${p.name}</h4>
-                        <p class="text-xs text-gray-500">Bestand: ${p.stock ?? 0}</p>
+            list.innerHTML = boxes.map(boxName => {
+                const count = allProducts.filter(p => (p.category || 'Allgemein') === boxName).length;
+                const hasLowStock = allProducts.some(p => (p.category || 'Allgemein') === boxName && (p.stock ?? 0) <= 5);
+
+                return `
+                    <div onclick="openBox('${boxName}')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer active:scale-98 transition-all">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 rounded-xl ${hasLowStock ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-blue-600'} flex items-center justify-center">
+                                <i data-lucide="archive" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-gray-900 text-base">${boxName}</h4>
+                                <p class="text-xs text-gray-500">${count} Produkt(e) enthalten</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            ${hasLowStock ? '<span class="w-2.5 h-2.5 bg-amber-500 rounded-full"></span>' : ''}
+                            <i data-lucide="chevron-right" class="w-5 h-5 text-gray-400"></i>
+                        </div>
                     </div>
-                    <div class="flex items-center space-x-2">
-                        <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-lg bg-gray-100 font-bold text-lg">-</button>
-                        <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 font-bold text-lg">+</button>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // Kiste öffnen & Produkte anzeigen
+        function openBox(boxName) {
+            activeBox = boxName;
+            document.getElementById('header-title').innerText = `Kiste: ${boxName}`;
+            document.getElementById('back-btn').classList.remove('hidden');
+            renderProductsInBox(boxName);
+        }
+
+        function showBoxOverview() {
+            renderBoxes();
+        }
+
+        function renderProductsInBox(boxName) {
+            const list = document.getElementById('content-list');
+            const boxProducts = allProducts.filter(p => (p.category || 'Allgemein') === boxName);
+
+            if (boxProducts.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-10 text-sm">Diese Kiste ist leer. Tippe auf "+", um ein Produkt hinzuzufügen.</div>`;
+                return;
+            }
+
+            list.innerHTML = boxProducts.map(p => {
+                const isLow = (p.stock ?? 0) <= 5;
+                return `
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border ${isLow ? 'border-amber-300 bg-amber-50/30' : 'border-gray-100'} flex items-center justify-between">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h4 class="font-semibold text-gray-900 text-sm">${p.name}</h4>
+                                ${isLow ? '<span class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Niedrig</span>' : ''}
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-800'}">${p.stock ?? 0}</span></p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) - 1})" class="w-9 h-9 rounded-xl bg-gray-100 font-bold text-lg active:scale-90 transition-transform">-</button>
+                            <button onclick="updateStock('${p.id}', ${(p.stock ?? 0) + 1})" class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 font-bold text-lg active:scale-90 transition-transform">+</button>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             lucide.createIcons();
         }
@@ -165,25 +260,50 @@
             if (!error) fetchProducts();
         }
 
-        function openModal() {
-            document.getElementById('prod-name').value = '';
-            document.getElementById('prod-stock').value = '';
-            document.getElementById('product-modal').classList.remove('hidden');
+        // Modal Steuerung
+        function openAddModal() {
+            const inputs = document.getElementById('modal-inputs');
+            if (activeBox) {
+                // In einer Kiste: Produkt hinzufügen
+                document.getElementById('modal-title').innerText = `Neues Produkt in "${activeBox}"`;
+                inputs.innerHTML = `
+                    <input type="text" id="prod-name" placeholder="Produktname (z. B. Ölfilter)" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
+                `;
+            } else {
+                // In Hauptansicht: Neue Kiste erstellen
+                document.getElementById('modal-title').innerText = "Neue Kiste anlegen";
+                inputs.innerHTML = `
+                    <input type="text" id="box-name" placeholder="Kisten-Name (z. B. Auto, Werkstatt)" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
+                    <input type="text" id="prod-name" placeholder="Erstes Produkt in der Kiste" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-3.5 py-2.5 bg-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500">
+                `;
+            }
+            document.getElementById('add-modal').classList.remove('hidden');
         }
 
         function closeModal() {
-            document.getElementById('product-modal').classList.add('hidden');
+            document.getElementById('add-modal').classList.add('hidden');
         }
 
-        async function saveProduct() {
+        async function submitModal() {
+            let category = activeBox;
+            if (!activeBox) {
+                category = document.getElementById('box-name').value.trim();
+            }
+
             const name = document.getElementById('prod-name').value.trim();
             const stock = parseInt(document.getElementById('prod-stock').value) || 0;
 
-            if (!name) return alert("Bitte Name eingeben.");
+            if (!category || !name) {
+                return alert("Bitte alle Felder ausfüllen.");
+            }
 
-            const { error } = await db.from('products').insert([{ name, stock }]);
-            if (error) alert("Fehler: " + error.message);
-            else {
+            const { error } = await db.from('products').insert([{ name, stock, category }]);
+            
+            if (error) {
+                alert("Fehler beim Speichern: " + error.message);
+            } else {
                 closeModal();
                 fetchProducts();
             }
