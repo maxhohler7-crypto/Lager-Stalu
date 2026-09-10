@@ -14,6 +14,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
+  <!-- html5-qrcode für Kamera-Scanner -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
   <style>
     :root {
       --bg-color: #ffffff;
@@ -45,7 +48,12 @@
       border-bottom: 1px solid var(--border-color);
     }
 
-    .settings-btn {
+    .header-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .settings-btn, .scan-btn {
       background: none;
       border: 1px solid var(--border-color);
       color: var(--text-color);
@@ -132,13 +140,18 @@
       margin-top: 15px;
       cursor: pointer;
     }
+
+    #reader {
+      width: 100%;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     const initialItems = [
       { id: '1', name: 'Spax Schrauben 4x40', barcode: '400123456789', quantity: 3, minQuantity: 10, unit: 'Packung' },
@@ -152,6 +165,8 @@
       });
 
       const [showSettings, setShowSettings] = useState(false);
+      const [showScanner, setShowScanner] = useState(false);
+      const [scannedResult, setScannedResult] = useState(null);
 
       const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('app_settings');
@@ -174,6 +189,39 @@
           document.body.classList.remove('dark-mode');
         }
       }, [settings]);
+
+      // Kamera Scanner Initialisierung
+      useEffect(() => {
+        let html5QrcodeScanner;
+        if (showScanner) {
+          html5QrcodeScanner = new Html5QrcodeScanner("reader", {
+            fps: 10,
+            qrbox: { width: 250, height: 150 }
+          });
+
+          html5QrcodeScanner.render((decodedText) => {
+            triggerFeedback();
+            const matchedItem = items.find(i => i.barcode === decodedText);
+            
+            if (matchedItem) {
+              setScannedResult({ success: true, item: matchedItem, barcode: decodedText });
+            } else {
+              setScannedResult({ success: false, barcode: decodedText });
+            }
+            
+            html5QrcodeScanner.clear();
+            setShowScanner(false);
+          }, (error) => {
+            // Ignoriere laufende Frame-Fehler
+          });
+        }
+
+        return () => {
+          if (html5QrcodeScanner) {
+            html5QrcodeScanner.clear().catch(() => {});
+          }
+        };
+      }, [showScanner, items]);
 
       const triggerFeedback = () => {
         if (settings.hapticFeedback && navigator.vibrate) {
@@ -224,13 +272,45 @@
 
       return (
         <div>
-          {/* Kopfzeile: Original wie vorher, nur mit Zahnrad rechts */}
+          {/* Kopfzeile */}
           <div className="header-bar">
             <h2 style={{ margin: 0 }}>Lagerbestand</h2>
-            <button className="settings-btn" onClick={() => setShowSettings(true)}>⚙️</button>
+            <div className="header-actions">
+              <button className="scan-btn" onClick={() => setShowScanner(true)}>📷</button>
+              <button className="settings-btn" onClick={() => setShowSettings(true)}>⚙️</button>
+            </div>
           </div>
 
           <div className="container">
+            {/* Benachrichtigung nach dem Scannen */}
+            {scannedResult && (
+              <div className="item-card" style={{ border: '2px solid #333' }}>
+                {scannedResult.success ? (
+                  <div>
+                    <strong>Erkannt: {scannedResult.item.name}</strong>
+                    <p style={{ margin: '5px 0' }}>Aktueller Bestand: {scannedResult.item.quantity} {scannedResult.item.unit}</p>
+                    <div className="quick-actions">
+                      <button onClick={() => updateQuantity(scannedResult.item.id, -1)}>-1</button>
+                      <button onClick={() => updateQuantity(scannedResult.item.id, 1)}>+1</button>
+                      <button onClick={() => updateQuantity(scannedResult.item.id, 5)}>+5</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <strong>Unbekannter Barcode: {scannedResult.barcode}</strong>
+                    <p style={{ margin: '5px 0', fontSize: '0.9rem' }}>Kein Produkt mit diesem Barcode in der Liste gefunden.</p>
+                  </div>
+                )}
+                <button 
+                  style={{ width: '100%', marginTop: '10px', padding: '6px' }} 
+                  onClick={() => setScannedResult(null)}
+                >
+                  Schließen
+                </button>
+              </div>
+            )}
+
+            {/* Artikelliste */}
             {items.map(item => {
               const isLow = item.quantity <= item.minQuantity;
               return (
@@ -254,6 +334,17 @@
               );
             })}
           </div>
+
+          {/* Scanner Modal */}
+          {showScanner && (
+            <div className="modal-overlay" onClick={() => setShowScanner(false)}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <h3 style={{ marginTop: 0 }}>Barcode scannen</h3>
+                <div id="reader"></div>
+                <button className="btn-close" onClick={() => setShowScanner(false)}>Abbrechen</button>
+              </div>
+            </div>
+          )}
 
           {/* Einstellungs-Fenster (Pop-up) */}
           {showSettings && (
