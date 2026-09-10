@@ -8,10 +8,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- HTML5 Barcode/QR Code Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-font-smoothing: antialiased;
+        }
+        #reader video {
+            border-radius: 1.5rem;
+            object-fit: cover;
         }
     </style>
 </head>
@@ -85,17 +91,17 @@
             <div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Daten...</div>
         </main>
 
-        <!-- Untere Navigationsleiste mit prominentem Wareneingang-Button -->
+        <!-- Untere Navigationsleiste -->
         <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-xl border-t border-gray-200/60 py-2 px-4 flex justify-around items-center z-30">
             <button id="tab-lager" onclick="switchTab('lager')" class="flex flex-col items-center text-blue-600 transition-all active:scale-95 w-16">
                 <i data-lucide="box" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Lager</span>
             </button>
             
-            <!-- Neuer Wareneingang Schnell-Button -->
+            <!-- Wareneingang Button mit Scanner Icon -->
             <button onclick="openQuickAddModal()" class="flex flex-col items-center justify-center -mt-5 transition-all active:scale-90">
                 <div class="w-13 h-13 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-3.5 rounded-full shadow-lg shadow-blue-500/40 border-4 border-gray-100 flex items-center justify-center">
-                    <i data-lucide="package-plus" class="w-6 h-6"></i>
+                    <i data-lucide="scan-barcode" class="w-6 h-6"></i>
                 </div>
                 <span class="text-[10px] font-bold text-blue-600 mt-1">Eingang</span>
             </button>
@@ -118,9 +124,7 @@
                 <h3 id="modal-title" class="text-lg font-bold text-gray-900">Neue Kiste</h3>
                 <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
-            <div class="space-y-3" id="modal-inputs">
-                <!-- Dynamische Eingabefelder -->
-            </div>
+            <div class="space-y-3" id="modal-inputs"></div>
             <div class="flex space-x-3 pt-2">
                 <button onclick="closeModal()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold text-sm transition-all">Abbrechen</button>
                 <button onclick="submitModal()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold text-sm shadow-md shadow-blue-500/25 transition-all">Speichern</button>
@@ -128,27 +132,36 @@
         </div>
     </div>
 
-    <!-- Modal: Wareneingang / Schnelleinbuchung -->
+    <!-- Modal: Wareneingang & Barcode Scanner -->
     <div id="quick-add-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 transition-all">
-        <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
+        <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center pb-1 border-b border-gray-100">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-900">Wareneingang buchen</h3>
-                    <p class="text-xs text-gray-400">Produkt wählen und Menge aufbuchen</p>
+                    <h3 class="text-lg font-bold text-gray-900">Wareneingang</h3>
+                    <p class="text-xs text-gray-400">Scannen oder manuell auswählen</p>
                 </div>
                 <button onclick="closeQuickAddModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
 
+            <!-- Kamera Scanner Bereich -->
+            <div id="scanner-container" class="hidden relative rounded-2xl overflow-hidden bg-black min-h-[200px]">
+                <div id="reader" class="w-full"></div>
+                <button onclick="stopScanner()" class="absolute top-2 right-2 bg-black/60 text-white px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md">Kamera schliessen</button>
+            </div>
+
+            <button id="start-scan-btn" onclick="startScanner()" class="w-full py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold rounded-2xl flex items-center justify-center space-x-2 transition-all">
+                <i data-lucide="camera" class="w-5 h-5"></i>
+                <span class="text-sm">Barcode mit Kamera scannen</span>
+            </button>
+
             <!-- Suchfeld -->
             <div class="relative">
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
-                <input type="text" id="quick-search" oninput="filterQuickAddList()" placeholder="Produkt suchen..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                <input type="text" id="quick-search" oninput="filterQuickAddList()" placeholder="Produkt oder Strichcode..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
             </div>
 
-            <!-- Produktliste zur Auswahl -->
-            <div id="quick-product-list" class="flex-1 overflow-y-auto space-y-2 pr-1 my-2">
-                <!-- Dynamisch befüllt -->
-            </div>
+            <!-- Produktliste -->
+            <div id="quick-product-list" class="flex-1 overflow-y-auto space-y-2 pr-1 my-2"></div>
 
             <!-- Eingabebereich für gewählte Ware -->
             <div id="quick-booking-form" class="hidden pt-3 border-t border-gray-100 space-y-3 bg-blue-50/50 p-3 rounded-2xl">
@@ -173,6 +186,7 @@
         let currentTab = 'lager';
         let currentUser = null;
         let selectedQuickProduct = null;
+        let html5QrcodeScanner = null;
 
         window.onload = async () => {
             lucide.createIcons();
@@ -360,6 +374,7 @@
                                 Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span>
                                 <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
                             </p>
+                            ${p.barcode ? `<p class="text-[10px] text-indigo-500 font-mono mt-0.5">Code: ${p.barcode}</p>` : ''}
                         </div>
                         <div class="flex items-center space-x-2">
                             <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
@@ -398,7 +413,51 @@
             }
         }
 
-        // --- WARENEINGANG / QUICK-ADD LOGIK ---
+        // --- BARCODE SCANNER LOGIK ---
+        function startScanner() {
+            document.getElementById('scanner-container').classList.remove('hidden');
+            document.getElementById('start-scan-btn').classList.add('hidden');
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (decodedText) => {
+                    // Erkannt!
+                    stopScanner();
+                    handleScannedCode(decodedText);
+                },
+                (errorMessage) => { /* ignoriere Frame-Fehler */ }
+            ).catch(err => {
+                alert("Kamera-Zugriff nicht möglich: " + err);
+                stopScanner();
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    html5QrcodeScanner = null;
+                }).catch(() => {});
+            }
+            document.getElementById('scanner-container').classList.add('hidden');
+            document.getElementById('start-scan-btn').classList.remove('hidden');
+        }
+
+        function handleScannedCode(barcodeText) {
+            const foundProduct = allProducts.find(p => p.barcode === barcodeText || p.name.toLowerCase() === barcodeText.toLowerCase());
+
+            if (foundProduct) {
+                selectQuickProduct(foundProduct.name, foundProduct.stock ?? 0);
+            } else {
+                alert(`Barcode "${barcodeText}" wurde keinem Produkt zugeordnet.\n\nDu kannst diesen Code jetzt beim Produkt im Menü eintragen.`);
+                document.getElementById('quick-search').value = barcodeText;
+                filterQuickAddList();
+            }
+        }
+
+        // --- WARENEINGANG LOGIK ---
         function openQuickAddModal() {
             selectedQuickProduct = null;
             document.getElementById('quick-booking-form').classList.add('hidden');
@@ -408,6 +467,7 @@
         }
 
         function closeQuickAddModal() {
+            stopScanner();
             document.getElementById('quick-add-modal').classList.add('hidden');
         }
 
@@ -415,7 +475,6 @@
             const query = document.getElementById('quick-search').value.toLowerCase();
             const list = document.getElementById('quick-product-list');
 
-            // Einzigartige Produkte nach Namen filtern
             const uniqueMap = new Map();
             allProducts.forEach(p => {
                 if (!uniqueMap.has(p.name.toLowerCase())) {
@@ -424,7 +483,10 @@
             });
             const uniqueProducts = Array.from(uniqueMap.values());
 
-            const filtered = uniqueProducts.filter(p => p.name.toLowerCase().includes(query));
+            const filtered = uniqueProducts.filter(p => 
+                p.name.toLowerCase().includes(query) || 
+                (p.barcode && p.barcode.toLowerCase().includes(query))
+            );
 
             if (filtered.length === 0) {
                 list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Keine Produkte gefunden.</div>`;
@@ -435,7 +497,10 @@
                 <div onclick="selectQuickProduct('${p.name}', ${p.stock ?? 0})" class="p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-2xl flex justify-between items-center cursor-pointer transition-all active:scale-98">
                     <div>
                         <h5 class="font-bold text-gray-900 text-sm">${p.name}</h5>
-                        <p class="text-[11px] text-gray-400 font-medium">Kiste: ${p.category || 'Allgemein'}</p>
+                        <p class="text-[11px] text-gray-400 font-medium">
+                            Kiste: ${p.category || 'Allgemein'}
+                            ${p.barcode ? ` | Code: ${p.barcode}` : ''}
+                        </p>
                     </div>
                     <span class="text-xs font-bold text-gray-600 bg-white px-2.5 py-1 rounded-xl border border-gray-200">
                         Aktuell: ${p.stock ?? 0}
@@ -462,7 +527,6 @@
             }
 
             const newTotalStock = selectedQuickProduct.currentStock + addQty;
-
             const { error } = await db.from('products').update({ stock: newTotalStock }).eq('name', selectedQuickProduct.name);
 
             if (error) {
@@ -559,6 +623,7 @@
                 document.getElementById('modal-title').innerText = `Neues Produkt`;
                 inputs.innerHTML = `
                     <input type="text" id="prod-name" placeholder="Produktname" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="text" id="prod-barcode" placeholder="Barcode / EAN (Optional)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
                     <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="prod-min" placeholder="Mindestbestand (Standard: 5)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
@@ -567,6 +632,7 @@
                 inputs.innerHTML = `
                     <input type="text" id="box-name" placeholder="Name der Kiste (z. B. Auto)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="prod-name" placeholder="Erstes Produkt" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="text" id="prod-barcode" placeholder="Barcode / EAN (Optional)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
                     <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="prod-min" placeholder="Mindestbestand (Standard: 5)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
@@ -585,6 +651,7 @@
             }
 
             const name = document.getElementById('prod-name').value.trim();
+            const barcode = document.getElementById('prod-barcode') ? document.getElementById('prod-barcode').value.trim() : null;
             let stock = parseInt(document.getElementById('prod-stock').value);
             const minStockVal = document.getElementById('prod-min').value;
             const min_stock = minStockVal !== "" ? parseInt(minStockVal) : 5;
@@ -595,21 +662,20 @@
 
             const existingProduct = allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
             if (existingProduct) {
-                if (isNaN(stock)) {
-                    stock = existingProduct.stock;
-                } else if (stock !== existingProduct.stock) {
-                    await db.from('products').update({ stock: stock }).eq('name', existingProduct.name);
+                if (isNaN(stock)) stock = existingProduct.stock;
+                else if (stock !== existingProduct.stock) {
+                    await db.from('products').update({ stock: stock, barcode: barcode || existingProduct.barcode }).eq('name', existingProduct.name);
                 }
             } else {
                 if (isNaN(stock)) stock = 0;
             }
 
-            const { error } = await db.from('products').insert([{ name, stock, category, min_stock }]);
+            const { error } = await db.from('products').insert([{ name, stock, category, min_stock, barcode }]);
             
             if (error) {
                 alert("Fehler beim Speichern: " + error.message);
             } else {
-                logActivity(`hat das Produkt "${name}" in Kiste "${category}" erstellt (Bestand: ${stock}, Min: ${min_stock})`);
+                logActivity(`hat das Produkt "${name}" in Kiste "${category}" erstellt (Bestand: ${stock})`);
                 closeModal();
                 fetchProducts();
             }
