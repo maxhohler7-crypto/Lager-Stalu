@@ -77,15 +77,15 @@
             <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
                 <i data-lucide="alert-triangle" class="w-4 h-4"></i>
             </div>
-            <span id="low-stock-text" class="font-medium">Achtung: Einige Produkte haben einen niedrigen Bestand ($\le 5$)!</span>
+            <span id="low-stock-text" class="font-medium">Achtung: Einige Produkte haben einen niedrigen Bestand!</span>
         </div>
 
-        <!-- Hauptinhalt (Wechselt je nach Tab) -->
+        <!-- Hauptinhalt -->
         <main class="p-4 flex-1 space-y-3" id="content-list">
             <div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Daten...</div>
         </main>
 
-        <!-- Untere Navigationsleiste (Apple-Style Bottom Bar) -->
+        <!-- Untere Navigationsleiste -->
         <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-xl border-t border-gray-200/60 py-2.5 px-6 flex justify-around items-center z-30">
             <button id="tab-lager" onclick="switchTab('lager')" class="flex flex-col items-center text-blue-600 transition-all active:scale-95">
                 <i data-lucide="box" class="w-6 h-6"></i>
@@ -143,9 +143,7 @@
             document.getElementById('app-screen').classList.remove('hidden');
             document.getElementById('user-email').innerText = user.email;
             
-            // Profil in profiles Tabelle sicherstellen
             ensureUserProfile(user);
-
             switchTab('lager');
         }
 
@@ -181,18 +179,14 @@
             location.reload();
         }
 
-        // Tab Navigation
         function switchTab(tab) {
             currentTab = tab;
             
-            // Tab Buttons stylen
             ['lager', 'verlauf', 'mitarbeiter'].forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
-                if (t === tab) {
-                    btn.className = "flex flex-col items-center text-blue-600 transition-all active:scale-95";
-                } else {
-                    btn.className = "flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95";
-                }
+                btn.className = (t === tab) 
+                    ? "flex flex-col items-center text-blue-600 transition-all active:scale-95" 
+                    : "flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95";
             });
 
             const addBtn = document.getElementById('add-btn');
@@ -213,6 +207,12 @@
             }
         }
 
+        // Helper: Prüft, ob ein Produkt geringen Bestand hat
+        function isProductLow(p) {
+            const min = p.min_stock ?? 5;
+            return (p.stock ?? 0) <= min;
+        }
+
         // --- LAGER TAB ---
         async function fetchProducts() {
             const { data, error } = await db.from('products').select('*');
@@ -229,12 +229,12 @@
         }
 
         function checkLowStockGlobal() {
-            const lowItems = allProducts.filter(p => (p.stock ?? 0) <= 5);
+            const lowItems = allProducts.filter(p => isProductLow(p));
             const banner = document.getElementById('low-stock-banner');
             if (lowItems.length > 0 && currentTab === 'lager') {
                 banner.classList.remove('hidden');
                 document.getElementById('low-stock-text').innerText = 
-                    `${lowItems.length} Artikel haben einen niedrigen Bestand ($\le 5$)!`;
+                    `${lowItems.length} Artikel haben ihren Mindestbestand erreicht!`;
             } else {
                 banner.classList.add('hidden');
             }
@@ -255,7 +255,7 @@
 
             list.innerHTML = boxes.map(boxName => {
                 const count = allProducts.filter(p => (p.category || 'Allgemein') === boxName).length;
-                const hasLowStock = allProducts.some(p => (p.category || 'Allgemein') === boxName && (p.stock ?? 0) <= 5);
+                const hasLowStock = allProducts.some(p => (p.category || 'Allgemein') === boxName && isProductLow(p));
 
                 return `
                     <div onclick="openBox('${boxName}')" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md active:scale-98 transition-all flex items-center justify-between cursor-pointer">
@@ -300,7 +300,8 @@
             }
 
             list.innerHTML = boxProducts.map(p => {
-                const isLow = (p.stock ?? 0) <= 5;
+                const isLow = isProductLow(p);
+                const min = p.min_stock ?? 5;
                 return `
                     <div class="bg-white p-4 rounded-3xl shadow-sm border ${isLow ? 'border-amber-300 bg-amber-50/20' : 'border-gray-100'} flex items-center justify-between">
                         <div>
@@ -308,11 +309,14 @@
                                 <h4 class="font-bold text-gray-900 text-sm">${p.name}</h4>
                                 ${isLow ? '<span class="text-[10px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Gering</span>' : ''}
                             </div>
-                            <p class="text-xs text-gray-400 font-medium mt-0.5">Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span></p>
+                            <p class="text-xs text-gray-400 font-medium mt-0.5">
+                                Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span>
+                                <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
+                            </p>
                         </div>
                         <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
-                            <button onclick="updateStock('${p.id}', '${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
-                            <button onclick="updateStock('${p.id}', '${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
+                            <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
+                            <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
                         </div>
                     </div>
                 `;
@@ -321,11 +325,12 @@
             lucide.createIcons();
         }
 
-        async function updateStock(id, prodName, newStock) {
+        // Synchronisiert alle Produkte mit demselben Namen!
+        async function updateStockByName(prodName, newStock) {
             if (newStock < 0) return;
-            const { error } = await db.from('products').update({ stock: newStock }).eq('id', id);
+            const { error } = await db.from('products').update({ stock: newStock }).eq('name', prodName);
             if (!error) {
-                logActivity(`hat Bestandsänderung für "${prodName}" auf ${newStock} vorgenommen`);
+                logActivity(`hat Bestand von "${prodName}" global auf ${newStock} geändert`);
                 fetchProducts();
             }
         }
@@ -416,6 +421,7 @@
                 inputs.innerHTML = `
                     <input type="text" id="prod-name" placeholder="Produktname" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="prod-min" placeholder="Mindestbestand (Standard: 5)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
             } else {
                 document.getElementById('modal-title').innerText = "Neue Kiste";
@@ -423,6 +429,7 @@
                     <input type="text" id="box-name" placeholder="Name der Kiste (z. B. Auto)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="prod-name" placeholder="Erstes Produkt" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="prod-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="prod-min" placeholder="Mindestbestand (Standard: 5)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
             }
             document.getElementById('add-modal').classList.remove('hidden');
@@ -439,18 +446,34 @@
             }
 
             const name = document.getElementById('prod-name').value.trim();
-            const stock = parseInt(document.getElementById('prod-stock').value) || 0;
+            let stock = parseInt(document.getElementById('prod-stock').value);
+            const minStockVal = document.getElementById('prod-min').value;
+            const min_stock = minStockVal !== "" ? parseInt(minStockVal) : 5;
 
             if (!category || !name) {
                 return alert("Bitte Name und Produkt ausfüllen.");
             }
 
-            const { error } = await db.from('products').insert([{ name, stock, category }]);
+            // Prüfen, ob Produkt bereits existiert (Bestand synchronisieren)
+            const existingProduct = allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
+            if (existingProduct) {
+                // Übernehme den bestehenden Bestand, falls kein neuer explizit eingegeben wurde
+                if (isNaN(stock)) {
+                    stock = existingProduct.stock;
+                } else if (stock !== existingProduct.stock) {
+                    // Update auch bei allen anderen Produkteintragen gleichen Namens
+                    await db.from('products').update({ stock: stock }).eq('name', existingProduct.name);
+                }
+            } else {
+                if (isNaN(stock)) stock = 0;
+            }
+
+            const { error } = await db.from('products').insert([{ name, stock, category, min_stock }]);
             
             if (error) {
                 alert("Fehler beim Speichern: " + error.message);
             } else {
-                logActivity(`hat das Produkt "${name}" in Kiste "${category}" erstellt (Bestand: ${stock})`);
+                logActivity(`hat das Produkt "${name}" in Kiste "${category}" erstellt (Bestand: ${stock}, Min: ${min_stock})`);
                 closeModal();
                 fetchProducts();
             }
