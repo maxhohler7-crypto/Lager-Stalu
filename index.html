@@ -51,7 +51,7 @@
 
     <!-- Haupt-App -->
     <div id="app-screen" class="hidden max-w-md mx-auto min-h-screen flex flex-col pb-24">
-        <!-- Sticky Header mit Glassmorphism -->
+        <!-- Header -->
         <header class="bg-white/80 backdrop-blur-md border-b border-gray-200/60 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
             <div class="flex items-center space-x-3">
                 <button id="back-btn" onclick="showBoxOverview()" class="hidden w-9 h-9 rounded-full bg-gray-100/80 hover:bg-gray-200 active:scale-90 text-gray-700 flex items-center justify-center transition-all">
@@ -85,24 +85,33 @@
             <div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Daten...</div>
         </main>
 
-        <!-- Untere Navigationsleiste -->
-        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-xl border-t border-gray-200/60 py-2.5 px-6 flex justify-around items-center z-30">
-            <button id="tab-lager" onclick="switchTab('lager')" class="flex flex-col items-center text-blue-600 transition-all active:scale-95">
-                <i data-lucide="box" class="w-6 h-6"></i>
+        <!-- Untere Navigationsleiste mit prominentem Wareneingang-Button -->
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/80 backdrop-blur-xl border-t border-gray-200/60 py-2 px-4 flex justify-around items-center z-30">
+            <button id="tab-lager" onclick="switchTab('lager')" class="flex flex-col items-center text-blue-600 transition-all active:scale-95 w-16">
+                <i data-lucide="box" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Lager</span>
             </button>
-            <button id="tab-verlauf" onclick="switchTab('verlauf')" class="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95">
-                <i data-lucide="history" class="w-6 h-6"></i>
+            
+            <!-- Neuer Wareneingang Schnell-Button -->
+            <button onclick="openQuickAddModal()" class="flex flex-col items-center justify-center -mt-5 transition-all active:scale-90">
+                <div class="w-13 h-13 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-3.5 rounded-full shadow-lg shadow-blue-500/40 border-4 border-gray-100 flex items-center justify-center">
+                    <i data-lucide="package-plus" class="w-6 h-6"></i>
+                </div>
+                <span class="text-[10px] font-bold text-blue-600 mt-1">Eingang</span>
+            </button>
+
+            <button id="tab-verlauf" onclick="switchTab('verlauf')" class="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95 w-16">
+                <i data-lucide="history" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Verlauf</span>
             </button>
-            <button id="tab-mitarbeiter" onclick="switchTab('mitarbeiter')" class="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95">
-                <i data-lucide="users" class="w-6 h-6"></i>
+            <button id="tab-mitarbeiter" onclick="switchTab('mitarbeiter')" class="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95 w-16">
+                <i data-lucide="users" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Mitarbeiter</span>
             </button>
         </nav>
     </div>
 
-    <!-- Modal Hinzufügen -->
+    <!-- Modal: Standard Hinzufügen (Kiste / Produkt) -->
     <div id="add-modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 transition-all">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-5 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center">
@@ -119,12 +128,51 @@
         </div>
     </div>
 
+    <!-- Modal: Wareneingang / Schnelleinbuchung -->
+    <div id="quick-add-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 transition-all">
+        <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center pb-1 border-b border-gray-100">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">Wareneingang buchen</h3>
+                    <p class="text-xs text-gray-400">Produkt wählen und Menge aufbuchen</p>
+                </div>
+                <button onclick="closeQuickAddModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <!-- Suchfeld -->
+            <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
+                <input type="text" id="quick-search" oninput="filterQuickAddList()" placeholder="Produkt suchen..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            </div>
+
+            <!-- Produktliste zur Auswahl -->
+            <div id="quick-product-list" class="flex-1 overflow-y-auto space-y-2 pr-1 my-2">
+                <!-- Dynamisch befüllt -->
+            </div>
+
+            <!-- Eingabebereich für gewählte Ware -->
+            <div id="quick-booking-form" class="hidden pt-3 border-t border-gray-100 space-y-3 bg-blue-50/50 p-3 rounded-2xl">
+                <div class="flex justify-between items-center">
+                    <span id="selected-product-name" class="font-bold text-sm text-gray-900"></span>
+                    <span id="selected-product-stock" class="text-xs text-gray-500"></span>
+                </div>
+                <div class="flex space-x-2">
+                    <input type="number" id="quick-quantity" placeholder="+ Menge (z.B. 100)" class="flex-1 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+                    <button onclick="submitQuickBooking()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold rounded-xl text-sm shadow-md shadow-blue-500/20 transition-all">
+                        Buchen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let allProducts = [];
         let authMode = 'login';
         let activeBox = null;
         let currentTab = 'lager';
         let currentUser = null;
+        let selectedQuickProduct = null;
 
         window.onload = async () => {
             lucide.createIcons();
@@ -185,8 +233,8 @@
             ['lager', 'verlauf', 'mitarbeiter'].forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
                 btn.className = (t === tab) 
-                    ? "flex flex-col items-center text-blue-600 transition-all active:scale-95" 
-                    : "flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95";
+                    ? "flex flex-col items-center text-blue-600 transition-all active:scale-95 w-16" 
+                    : "flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95 w-16";
             });
 
             const addBtn = document.getElementById('add-btn');
@@ -318,7 +366,6 @@
                                 <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
                                 <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
                             </div>
-                            <!-- Löschen-Button -->
                             <button onclick="deleteProduct('${p.id}', '${p.name}')" class="w-9 h-9 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all flex items-center justify-center ml-1">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
@@ -339,7 +386,6 @@
             }
         }
 
-        // Produkt löschen
         async function deleteProduct(id, prodName) {
             if (!confirm(`Möchtest du "${prodName}" wirklich aus dieser Kiste löschen?`)) return;
 
@@ -348,6 +394,82 @@
                 alert("Fehler beim Löschen: " + error.message);
             } else {
                 logActivity(`hat das Produkt "${prodName}" aus Kiste "${activeBox}" gelöscht`);
+                fetchProducts();
+            }
+        }
+
+        // --- WARENEINGANG / QUICK-ADD LOGIK ---
+        function openQuickAddModal() {
+            selectedQuickProduct = null;
+            document.getElementById('quick-booking-form').classList.add('hidden');
+            document.getElementById('quick-search').value = '';
+            filterQuickAddList();
+            document.getElementById('quick-add-modal').classList.remove('hidden');
+        }
+
+        function closeQuickAddModal() {
+            document.getElementById('quick-add-modal').classList.add('hidden');
+        }
+
+        function filterQuickAddList() {
+            const query = document.getElementById('quick-search').value.toLowerCase();
+            const list = document.getElementById('quick-product-list');
+
+            // Einzigartige Produkte nach Namen filtern
+            const uniqueMap = new Map();
+            allProducts.forEach(p => {
+                if (!uniqueMap.has(p.name.toLowerCase())) {
+                    uniqueMap.set(p.name.toLowerCase(), p);
+                }
+            });
+            const uniqueProducts = Array.from(uniqueMap.values());
+
+            const filtered = uniqueProducts.filter(p => p.name.toLowerCase().includes(query));
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Keine Produkte gefunden.</div>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(p => `
+                <div onclick="selectQuickProduct('${p.name}', ${p.stock ?? 0})" class="p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-2xl flex justify-between items-center cursor-pointer transition-all active:scale-98">
+                    <div>
+                        <h5 class="font-bold text-gray-900 text-sm">${p.name}</h5>
+                        <p class="text-[11px] text-gray-400 font-medium">Kiste: ${p.category || 'Allgemein'}</p>
+                    </div>
+                    <span class="text-xs font-bold text-gray-600 bg-white px-2.5 py-1 rounded-xl border border-gray-200">
+                        Aktuell: ${p.stock ?? 0}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        function selectQuickProduct(name, currentStock) {
+            selectedQuickProduct = { name, currentStock };
+            document.getElementById('selected-product-name').innerText = name;
+            document.getElementById('selected-product-stock').innerText = `Aktueller Bestand: ${currentStock}`;
+            document.getElementById('quick-quantity').value = '';
+            document.getElementById('quick-booking-form').classList.remove('hidden');
+            document.getElementById('quick-quantity').focus();
+        }
+
+        async function submitQuickBooking() {
+            if (!selectedQuickProduct) return;
+            const addQty = parseInt(document.getElementById('quick-quantity').value);
+
+            if (isNaN(addQty) || addQty <= 0) {
+                return alert("Bitte eine gültige Menge größer als 0 eingeben.");
+            }
+
+            const newTotalStock = selectedQuickProduct.currentStock + addQty;
+
+            const { error } = await db.from('products').update({ stock: newTotalStock }).eq('name', selectedQuickProduct.name);
+
+            if (error) {
+                alert("Fehler beim Buchen: " + error.message);
+            } else {
+                logActivity(`hat Wareneingang von +${addQty} für "${selectedQuickProduct.name}" gebucht (Neuer Bestand: ${newTotalStock})`);
+                closeQuickAddModal();
                 fetchProducts();
             }
         }
