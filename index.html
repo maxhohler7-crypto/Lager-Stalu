@@ -102,7 +102,7 @@
         </nav>
     </div>
 
-    <!-- Modal im Apple-Stil -->
+    <!-- Modal Hinzufügen -->
     <div id="add-modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 transition-all">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-5 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center">
@@ -207,7 +207,6 @@
             }
         }
 
-        // Helper: Prüft, ob ein Produkt geringen Bestand hat
         function isProductLow(p) {
             const min = p.min_stock ?? 5;
             return (p.stock ?? 0) <= min;
@@ -314,9 +313,15 @@
                                 <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
                             </p>
                         </div>
-                        <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
-                            <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
-                            <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
+                        <div class="flex items-center space-x-2">
+                            <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
+                                <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
+                                <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
+                            </div>
+                            <!-- Löschen-Button -->
+                            <button onclick="deleteProduct('${p.id}', '${p.name}')" class="w-9 h-9 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all flex items-center justify-center ml-1">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
                         </div>
                     </div>
                 `;
@@ -325,12 +330,24 @@
             lucide.createIcons();
         }
 
-        // Synchronisiert alle Produkte mit demselben Namen!
         async function updateStockByName(prodName, newStock) {
             if (newStock < 0) return;
             const { error } = await db.from('products').update({ stock: newStock }).eq('name', prodName);
             if (!error) {
                 logActivity(`hat Bestand von "${prodName}" global auf ${newStock} geändert`);
+                fetchProducts();
+            }
+        }
+
+        // Produkt löschen
+        async function deleteProduct(id, prodName) {
+            if (!confirm(`Möchtest du "${prodName}" wirklich aus dieser Kiste löschen?`)) return;
+
+            const { error } = await db.from('products').delete().eq('id', id);
+            if (error) {
+                alert("Fehler beim Löschen: " + error.message);
+            } else {
+                logActivity(`hat das Produkt "${prodName}" aus Kiste "${activeBox}" gelöscht`);
                 fetchProducts();
             }
         }
@@ -454,14 +471,11 @@
                 return alert("Bitte Name und Produkt ausfüllen.");
             }
 
-            // Prüfen, ob Produkt bereits existiert (Bestand synchronisieren)
             const existingProduct = allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
             if (existingProduct) {
-                // Übernehme den bestehenden Bestand, falls kein neuer explizit eingegeben wurde
                 if (isNaN(stock)) {
                     stock = existingProduct.stock;
                 } else if (stock !== existingProduct.stock) {
-                    // Update auch bei allen anderen Produkteintragen gleichen Namens
                     await db.from('products').update({ stock: stock }).eq('name', existingProduct.name);
                 }
             } else {
