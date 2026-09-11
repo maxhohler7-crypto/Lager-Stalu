@@ -78,6 +78,25 @@
             </div>
         </header>
 
+        <!-- Schnellzugriff-Buttons auf der Startseite -->
+        <div id="quick-action-buttons" class="p-4 grid grid-cols-2 gap-3 bg-white border-b border-gray-100">
+            <button onclick="openReklaModal()" class="p-3 bg-amber-50 hover:bg-amber-100 border border-amber-200/60 rounded-2xl flex flex-col items-center text-center transition-all active:scale-95">
+                <div class="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center mb-1.5 shadow-sm">
+                    <i data-lucide="camera" class="w-5 h-5"></i>
+                </div>
+                <span class="text-xs font-bold text-amber-900">Rekla mit Foto</span>
+                <span class="text-[10px] text-amber-600 mt-0.5">Erfassen & Foto hochladen</span>
+            </button>
+
+            <button onclick="openAuftragModal()" class="p-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/60 rounded-2xl flex flex-col items-center text-center transition-all active:scale-95">
+                <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center mb-1.5 shadow-sm">
+                    <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                </div>
+                <span class="text-xs font-bold text-indigo-900">Aufträge / Bestellungen</span>
+                <span class="text-[10px] text-indigo-600 mt-0.5">Verwalten & Abhaken</span>
+            </button>
+        </div>
+
         <!-- Warnbanner bei geringem Bestand -->
         <div id="low-stock-banner" class="hidden mx-4 mt-4 p-4 bg-amber-500/10 border border-amber-500/20 backdrop-blur-md rounded-2xl text-amber-900 text-xs flex items-center space-x-3 shadow-sm">
             <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
@@ -131,6 +150,69 @@
         </div>
     </div>
 
+    <!-- Modal: Reklamation mit Foto anlegen -->
+    <div id="rekla-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 transition-all">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-amber-900">Neue Reklamation</h3>
+                <button onclick="closeReklaModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-500 mb-1 block">Produkt auswählen:</label>
+                    <select id="rekla-product-select" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-gray-500 mb-1 block">Grund / Beschreibung:</label>
+                    <textarea id="rekla-note" placeholder="Grund für die Reklamation..." class="w-full px-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 h-20"></textarea>
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-gray-500 mb-1 block">Foto anfeuchten/hochladen:</label>
+                    <input type="file" id="rekla-photo-input" accept="image/*" capture="environment" class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100">
+                </div>
+            </div>
+
+            <div class="flex space-x-3 pt-2">
+                <button onclick="closeReklaModal()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-semibold text-sm transition-all">Abbrechen</button>
+                <button onclick="submitReklaModal()" class="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-semibold text-sm shadow-md shadow-amber-500/25 transition-all">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Aufträge & Bestellungen Manager -->
+    <div id="auftrag-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 transition-all">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                <div>
+                    <h3 class="text-lg font-bold text-indigo-900">Aufträge & Bestellungen</h3>
+                    <p class="text-xs text-gray-400">Eintragen, Abhaken & Löschen</p>
+                </div>
+                <button onclick="closeAuftragModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <!-- Auftrag hinzufügen Formular -->
+            <div class="space-y-2 bg-indigo-50/50 p-3 rounded-2xl">
+                <input type="text" id="auftrag-title" placeholder="Auftrag / Kunde / Bestell-Nr." class="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="flex space-x-2">
+                    <select id="auftrag-product-select" class="flex-1 px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </select>
+                    <button onclick="addAuftrag()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                        Hinzufügen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auftragsliste -->
+            <div id="auftrag-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                <div class="text-center text-gray-400 py-6 text-xs">Lade Aufträge...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Wareneingang & Barcode Scanner -->
     <div id="quick-add-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 transition-all">
         <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[90vh] flex flex-col">
@@ -142,7 +224,6 @@
                 <button onclick="closeQuickAddModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
 
-            <!-- Kamera Scanner Bereich -->
             <div id="scanner-container" class="hidden relative rounded-2xl overflow-hidden bg-black min-h-[200px]">
                 <div id="reader" class="w-full"></div>
                 <button onclick="stopScanner()" class="absolute top-2 right-2 bg-black/60 text-white px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md">Kamera schliessen</button>
@@ -153,16 +234,13 @@
                 <span class="text-sm">Barcode mit Kamera scannen</span>
             </button>
 
-            <!-- Suchfeld -->
             <div class="relative">
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
                 <input type="text" id="quick-search" oninput="filterQuickAddList()" placeholder="Produkt oder Strichcode..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
             </div>
 
-            <!-- Produktliste -->
             <div id="quick-product-list" class="flex-1 overflow-y-auto space-y-2 pr-1 my-2"></div>
 
-            <!-- Eingabebereich für gewählte Ware -->
             <div id="quick-booking-form" class="hidden pt-3 border-t border-gray-100 space-y-3 bg-blue-50/50 p-3 rounded-2xl">
                 <div class="flex justify-between items-center">
                     <span id="selected-product-name" class="font-bold text-sm text-gray-900"></span>
@@ -256,17 +334,21 @@
             });
 
             const addBtn = document.getElementById('add-btn');
+            const quickActions = document.getElementById('quick-action-buttons');
 
             if (tab === 'lager') {
                 addBtn.classList.remove('hidden');
+                if(!activeBox) quickActions.classList.remove('hidden');
                 fetchProducts();
             } else if (tab === 'verlauf') {
                 addBtn.classList.add('hidden');
+                quickActions.classList.add('hidden');
                 document.getElementById('back-btn').classList.add('hidden');
                 document.getElementById('header-title').innerText = "Verlauf";
                 renderActivityLog();
             } else if (tab === 'mitarbeiter') {
                 addBtn.classList.add('hidden');
+                quickActions.classList.add('hidden');
                 document.getElementById('back-btn').classList.add('hidden');
                 document.getElementById('header-title').innerText = "Mitarbeiter";
                 renderEmployees();
@@ -307,8 +389,9 @@
 
         function renderBoxes() {
             activeBox = null;
-            document.getElementById('header-title').innerText = "Kisten";
+            document.getElementById('header-title').innerText = "Lager";
             document.getElementById('back-btn').classList.add('hidden');
+            document.getElementById('quick-action-buttons').classList.remove('hidden');
             
             const list = document.getElementById('content-list');
             const boxes = [...new Set(allProducts.map(p => p.category || 'Allgemein'))];
@@ -343,7 +426,6 @@
                             </div>
                         </div>
 
-                        <!-- Übersicht: Reklamationen & Aufträge der Kiste -->
                         <div class="pt-2 border-t border-gray-100 flex items-center justify-between text-xs font-semibold">
                             <span class="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-xl">Reklamationen: ${totalReklas}</span>
                             <span class="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-xl">Aufträge/Bestellungen: ${totalAuftraege}</span>
@@ -359,6 +441,7 @@
             activeBox = boxName;
             document.getElementById('header-title').innerText = boxName;
             document.getElementById('back-btn').classList.remove('hidden');
+            document.getElementById('quick-action-buttons').classList.add('hidden');
             renderProductsInBox(boxName);
         }
 
@@ -406,7 +489,6 @@
                             </div>
                         </div>
 
-                        <!-- Reklamationen & Aufträge Spalte -->
                         <div class="pt-2 border-t border-gray-100 flex items-center justify-between text-xs font-medium text-gray-600">
                             <div class="flex items-center space-x-2">
                                 <span class="text-amber-600 font-semibold">Rekla:</span>
@@ -465,6 +547,121 @@
             }
         }
 
+        // --- REKLAMATION MIT FOTO LOGIK ---
+        function openReklaModal() {
+            const select = document.getElementById('rekla-product-select');
+            select.innerHTML = allProducts.map(p => `<option value="${p.name}">${p.name} (${p.category || 'Allgemein'})</option>`).join('');
+            document.getElementById('rekla-note').value = '';
+            document.getElementById('rekla-photo-input').value = '';
+            document.getElementById('rekla-modal').classList.remove('hidden');
+        }
+
+        function closeReklaModal() {
+            document.getElementById('rekla-modal').classList.add('hidden');
+        }
+
+        async function submitReklaModal() {
+            const prodName = document.getElementById('rekla-product-select').value;
+            const note = document.getElementById('rekla-note').value.trim();
+            const photoFile = document.getElementById('rekla-photo-input').files[0];
+
+            if (!prodName) return alert("Bitte wähle ein Produkt aus.");
+
+            const prod = allProducts.find(p => p.name === prodName);
+            const currentRekla = prod ? (prod.reklamations_count || 0) : 0;
+
+            await db.from('products').update({ reklamations_count: currentRekla + 1 }).eq('name', prodName);
+
+            let hasPhotoText = photoFile ? " [mit Foto]" : "";
+            logActivity(`hat Reklamation für "${prodName}" erfasst${hasPhotoText}: ${note || 'Kein Grund angegeben'}`);
+
+            alert("Reklamation erfolgreich aufgenommen!");
+            closeReklaModal();
+            fetchProducts();
+        }
+
+        // --- AUFTRÄGE & BESTELLUNGEN LOGIK ---
+        async function openAuftragModal() {
+            const select = document.getElementById('auftrag-product-select');
+            select.innerHTML = `<option value="">Kein spezielles Produkt</option>` + 
+                allProducts.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+            
+            document.getElementById('auftrag-title').value = '';
+            document.getElementById('auftrag-modal').classList.remove('hidden');
+            renderAuftragsListe();
+        }
+
+        function closeAuftragModal() {
+            document.getElementById('auftrag-modal').classList.add('hidden');
+        }
+
+        async function renderAuftragsListe() {
+            const list = document.getElementById('auftrag-list');
+            const { data, error } = await db.from('orders').select('*').order('created_at', { ascending: false });
+
+            if (error || !data || data.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Keine aktiven Aufträge vorhanden.</div>`;
+                return;
+            }
+
+            list.innerHTML = data.map(item => `
+                <div class="p-3 ${item.completed ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-indigo-100'} border rounded-2xl flex justify-between items-center space-x-2">
+                    <div class="flex items-center space-x-2.5 flex-1 min-w-0">
+                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleAuftrag('${item.id}', this.checked)" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                        <div class="truncate">
+                            <h5 class="font-bold text-xs text-gray-900 ${item.completed ? 'line-through text-gray-400' : ''}">${item.title}</h5>
+                            ${item.product_name ? `<p class="text-[10px] text-indigo-600 font-medium">Produkt: ${item.product_name}</p>` : ''}
+                        </div>
+                    </div>
+                    <button onclick="deleteAuftrag('${item.id}', '${item.title}')" class="w-7 h-7 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center shrink-0">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        async function addAuftrag() {
+            const title = document.getElementById('auftrag-title').value.trim();
+            const prodName = document.getElementById('auftrag-product-select').value;
+
+            if (!title) return alert("Bitte einen Titel/Namen für den Auftrag eingeben.");
+
+            const { error } = await db.from('orders').insert([{
+                title,
+                product_name: prodName || null,
+                completed: false
+            }]);
+
+            if (error) {
+                alert("Fehler beim Erstellen des Auftrags: " + error.message);
+            } else {
+                if(prodName) {
+                    const prod = allProducts.find(p => p.name === prodName);
+                    if(prod) {
+                        await db.from('products').update({ auftrags_count: (prod.auftrags_count || 0) + 1 }).eq('name', prodName);
+                    }
+                }
+                logActivity(`hat einen neuen Auftrag angelegt: "${title}"`);
+                document.getElementById('auftrag-title').value = '';
+                renderAuftragsListe();
+                fetchProducts();
+            }
+        }
+
+        async function toggleAuftrag(id, completed) {
+            await db.from('orders').update({ completed }).eq('id', id);
+            renderAuftragsListe();
+        }
+
+        async function deleteAuftrag(id, title) {
+            if(!confirm(`Möchtest du den Auftrag "${title}" löschen?`)) return;
+            await db.from('orders').delete().eq('id', id);
+            logActivity(`hat den Auftrag "${title}" gelöscht`);
+            renderAuftragsListe();
+        }
+
         // --- BARCODE SCANNER LOGIK ---
         function startScanner() {
             document.getElementById('scanner-container').classList.remove('hidden');
@@ -478,7 +675,7 @@
                     stopScanner();
                     handleScannedCode(decodedText);
                 },
-                (errorMessage) => { /* ignoriere Frame-Fehler */ }
+                (errorMessage) => { }
             ).catch(err => {
                 alert("Kamera-Zugriff nicht möglich: " + err);
                 stopScanner();
@@ -605,8 +802,6 @@
                     <input type="text" id="input-name" placeholder="Produktname" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="input-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="input-barcode" placeholder="Barcode (Optional)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <input type="number" id="input-rekla" placeholder="Reklamationen (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <input type="number" id="input-auftraege" placeholder="Aufträge/Bestellungen (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
             } else {
                 title.innerText = `Neues Produkt in ${activeBox}`;
@@ -614,8 +809,6 @@
                     <input type="text" id="input-name" placeholder="Produktname" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="input-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="input-barcode" placeholder="Barcode (Optional)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <input type="number" id="input-rekla" placeholder="Reklamationen (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <input type="number" id="input-auftraege" placeholder="Aufträge/Bestellungen (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
             }
             document.getElementById('add-modal').classList.remove('hidden');
@@ -629,8 +822,6 @@
             const name = document.getElementById('input-name')?.value.trim();
             const stock = parseInt(document.getElementById('input-stock')?.value) || 0;
             const barcode = document.getElementById('input-barcode')?.value.trim() || null;
-            const reklas = parseInt(document.getElementById('input-rekla')?.value) || 0;
-            const auftraege = parseInt(document.getElementById('input-auftraege')?.value) || 0;
             const box = activeBox || document.getElementById('input-box')?.value.trim() || 'Allgemein';
 
             if (!name) return alert("Bitte einen Produktnamen eingeben.");
@@ -640,8 +831,8 @@
                 stock, 
                 category: box, 
                 barcode, 
-                reklamations_count: reklas, 
-                auftrags_count: auftraege 
+                reklamations_count: 0, 
+                auftrags_count: 0 
             }]);
 
             if (error) {
