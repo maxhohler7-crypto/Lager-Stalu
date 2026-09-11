@@ -146,7 +146,7 @@
         </div>
     </div>
 
-    <!-- Modal 2: Auftrag hinzufügen -->
+    <!-- Modal 2: Auftrag hinzufügen (inkl. Stückzahl) -->
     <div id="add-auftrag-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -157,6 +157,11 @@
                 <input type="text" id="auftrag-title" placeholder="Auftragsnummer / Titel" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
                 <input type="text" id="auftrag-produkt" placeholder="Produktname" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
                 
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Soll-Menge / Zu produzierende Stückzahl</label>
+                    <input type="number" id="auftrag-target" placeholder="z.B. 50" required min="1" value="10" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 mb-1">Foto aus Galerie/Kamera auswählen</label>
                     <input type="file" id="auftrag-file-input" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
@@ -170,7 +175,7 @@
         </div>
     </div>
 
-    <!-- Modal 3: Reklamation hinzufügen (mit Galerie/Kamera-Upload) -->
+    <!-- Modal 3: Reklamation hinzufügen -->
     <div id="add-rekla-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -240,11 +245,46 @@
         </div>
     </div>
 
+    <!-- Modal 5: Verkaufen (über Team geöffnet) -->
+    <div id="verkauf-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">Verkaufs-Portal</h3>
+                    <p class="text-xs text-gray-400">Ware aus dem Lager verkaufen</p>
+                </div>
+                <button onclick="closeVerkaufModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
+                <input type="text" id="verkauf-search" oninput="filterVerkaufList()" placeholder="Produkt suchen..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all">
+            </div>
+
+            <div id="verkauf-product-list" class="flex-1 overflow-y-auto space-y-2 pr-1 my-2"></div>
+
+            <div id="verkauf-booking-form" class="hidden pt-3 border-t border-gray-100 space-y-3 bg-emerald-50/60 p-3 rounded-2xl">
+                <div class="flex justify-between items-center">
+                    <span id="verkauf-selected-name" class="font-bold text-sm text-gray-900"></span>
+                    <div class="text-right text-xs text-gray-500">
+                        <div id="verkauf-selected-stock"></div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <input type="number" id="verkauf-quantity" placeholder="Verkaufsmenge (z.B. 5)" class="flex-1 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
+                    <button onclick="submitVerkaufBooking()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold rounded-xl text-sm shadow-md shadow-emerald-500/20 transition-all">
+                        Verkaufen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let allProducts = [];
         
         let sampleAuftraege = [
-            { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", image: "", erledigt: false }
+            { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", targetQuantity: 50, producedQuantity: 10, image: "", erledigt: false }
         ];
 
         let sampleReklamationen = [
@@ -256,6 +296,7 @@
         let currentTab = 'lager';
         let currentUser = null;
         let selectedQuickProduct = null;
+        let selectedVerkaufProduct = null;
         let html5QrcodeScanner = null;
 
         let selectedReklaImageBase64 = "";
@@ -275,7 +316,6 @@
         };
 
         function setupImageUploadListeners() {
-            // Reklamations-Bild Listener
             document.getElementById('rekla-file-input').addEventListener('change', function(e) {
                 const file = e.target.files[0];
                 if (file) {
@@ -289,7 +329,6 @@
                 }
             });
 
-            // Auftrags-Bild Listener
             document.getElementById('auftrag-file-input').addEventListener('change', function(e) {
                 const file = e.target.files[0];
                 if (file) {
@@ -372,8 +411,8 @@
             } else if (tab === 'mitarbeiter') {
                 addBtn.classList.add('hidden');
                 document.getElementById('back-btn').classList.add('hidden');
-                document.getElementById('header-title').innerText = "Mitarbeiter";
-                document.getElementById('content-list').innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Mitarbeiterverwaltung</div>`;
+                document.getElementById('header-title').innerText = "Team";
+                renderTeamScreen();
             }
         }
 
@@ -419,11 +458,14 @@
             e.preventDefault();
             const title = document.getElementById('auftrag-title').value;
             const produkt = document.getElementById('auftrag-produkt').value;
+            const targetQuantity = parseInt(document.getElementById('auftrag-target').value) || 1;
 
             sampleAuftraege.unshift({
                 id: Date.now(),
                 name: title,
                 produkt: produkt,
+                targetQuantity: targetQuantity,
+                producedQuantity: 0,
                 image: selectedAuftragImageBase64,
                 erledigt: false
             });
@@ -588,7 +630,7 @@
             lucide.createIcons();
         }
 
-        // --- AUFTRAGS-PORTAL ---
+        // --- AUFTRAGS-PORTAL (Mit Produktionsfortschritt) ---
         function openAuftragsPortal(filterProduktName = null) {
             document.getElementById('header-title').innerText = "Auftrags-Portal";
             document.getElementById('back-btn').classList.remove('hidden');
@@ -601,7 +643,7 @@
             let html = `
                 <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-4">
                     <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-gray-900">Aufträge</h3>
+                        <h3 class="font-bold text-gray-900">Aufträge & Produktion</h3>
                         ${filterProduktName ? `<span class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded-lg">${filterProduktName}</span>` : ''}
                     </div>
                     
@@ -612,20 +654,34 @@
                 html += `<div class="py-4 text-center text-gray-400 text-xs">Keine Aufträge vorhanden.</div>`;
             } else {
                 gefilterteAuftraege.forEach(auftrag => {
+                    const isDone = auftrag.producedQuantity >= auftrag.targetQuantity || auftrag.erledigt;
+                    
                     html += `
-                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex flex-col space-y-2">
+                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex flex-col space-y-3">
                             <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-3">
-                                    <input type="checkbox" ${auftrag.erledigt ? 'checked' : ''} onchange="toggleAuftragErledigt(${auftrag.id})" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
-                                    <div>
-                                        <h5 class="font-bold text-gray-800 text-xs ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.name}</h5>
-                                        <p class="text-[11px] text-gray-500 ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.produkt}</p>
-                                    </div>
+                                <div>
+                                    <h5 class="font-bold text-gray-800 text-sm ${isDone ? 'line-through-text' : ''}">${auftrag.name}</h5>
+                                    <p class="text-xs text-gray-500 font-medium">${auftrag.produkt}</p>
                                 </div>
-                                <button onclick="deleteAuftrag(${auftrag.id})" class="text-red-500 hover:text-red-700 p-2">
+                                <button onclick="deleteAuftrag(${auftrag.id})" class="text-red-500 hover:text-red-700 p-1">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
+
+                            <!-- Produktions-Zähler -->
+                            <div class="bg-white p-2.5 rounded-xl border border-gray-200/80 flex justify-between items-center">
+                                <div>
+                                    <span class="text-[11px] font-semibold text-gray-400 block">Produktionsfortschritt</span>
+                                    <span class="text-xs font-bold ${isDone ? 'text-emerald-600' : 'text-gray-800'}">
+                                        ${auftrag.producedQuantity} / ${auftrag.targetQuantity} Stk. ${isDone ? '✓ Fertig' : ''}
+                                    </span>
+                                </div>
+                                <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-xl">
+                                    <button onclick="updateAuftragQuantity(${auftrag.id}, -1)" class="w-7 h-7 rounded-lg bg-white text-gray-700 font-bold text-sm shadow-sm active:scale-90 transition-all">-</button>
+                                    <button onclick="updateAuftragQuantity(${auftrag.id}, 1)" class="w-7 h-7 rounded-lg bg-indigo-600 text-white font-bold text-sm shadow-sm active:scale-90 transition-all">+</button>
+                                </div>
+                            </div>
+
                             ${auftrag.image ? `<img src="${auftrag.image}" class="w-full h-32 rounded-xl object-cover border border-gray-200">` : ''}
                         </div>
                     `;
@@ -641,8 +697,18 @@
             lucide.createIcons();
         }
 
-        function toggleAuftragErledigt(id) {
-            sampleAuftraege = sampleAuftraege.map(a => a.id === id ? { ...a, erledigt: !a.erledigt } : a);
+        function updateAuftragQuantity(id, delta) {
+            sampleAuftraege = sampleAuftraege.map(a => {
+                if (a.id === id) {
+                    const newQty = Math.max(0, a.producedQuantity + delta);
+                    return {
+                        ...a,
+                        producedQuantity: newQty,
+                        erledigt: newQty >= a.targetQuantity
+                    };
+                }
+                return a;
+            });
             openAuftragsPortal();
         }
 
@@ -699,6 +765,131 @@
 
             list.innerHTML = html;
             lucide.createIcons();
+        }
+
+        // --- TEAM & VERKAUF TAB ---
+        async function renderTeamScreen() {
+            const list = document.getElementById('content-list');
+            
+            // Lade angemeldete Nutzer/Profile aus Supabase
+            const { data: profiles, error } = await db.from('profiles').select('*');
+
+            let html = `
+                <div class="space-y-4">
+                    <!-- Verkaufen Button -->
+                    <button onclick="openVerkaufModal()" class="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-3xl shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 active:scale-98 transition-all">
+                        <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+                        <span>Verkaufs-Portal öffnen</span>
+                    </button>
+
+                    <!-- Mitarbeiter Liste -->
+                    <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-3">
+                        <h3 class="font-bold text-gray-900 text-sm border-b border-gray-100 pb-2">Registriertes Team</h3>
+            `;
+
+            if (error || !profiles || profiles.length === 0) {
+                html += `<div class="p-3 text-xs text-gray-400 text-center">Keine Mitarbeiter gefunden.</div>`;
+            } else {
+                profiles.forEach(p => {
+                    const isMe = p.email === currentUser?.email;
+                    html += `
+                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                                    ${p.email ? p.email.substring(0, 2).toUpperCase() : 'MA'}
+                                </div>
+                                <div>
+                                    <h5 class="font-bold text-gray-800 text-xs">${p.email}</h5>
+                                    <span class="text-[10px] text-gray-400 font-medium">${isMe ? 'Aktuell angemeldet' : 'Mitarbeiter'}</span>
+                                </div>
+                            </div>
+                            ${isMe ? '<span class="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>' : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            list.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        // --- VERKAUFS-PORTAL MODAL LOGIK ---
+        function openVerkaufModal() {
+            selectedVerkaufProduct = null;
+            document.getElementById('verkauf-booking-form').classList.add('hidden');
+            document.getElementById('verkauf-search').value = '';
+            filterVerkaufList();
+            document.getElementById('verkauf-modal').classList.remove('hidden');
+        }
+
+        function closeVerkaufModal() {
+            document.getElementById('verkauf-modal').classList.add('hidden');
+        }
+
+        function filterVerkaufList() {
+            const query = document.getElementById('verkauf-search').value.toLowerCase();
+            const list = document.getElementById('verkauf-product-list');
+
+            const uniqueMap = new Map();
+            allProducts.forEach(p => {
+                if (!uniqueMap.has(p.name.toLowerCase())) {
+                    uniqueMap.set(p.name.toLowerCase(), p);
+                }
+            });
+            const uniqueProducts = Array.from(uniqueMap.values());
+
+            const filtered = uniqueProducts.filter(p => p.name.toLowerCase().includes(query));
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Keine Produkte vorhanden.</div>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(p => `
+                <div onclick="selectVerkaufProduct('${p.name}', ${p.stock ?? 0})" class="p-3 bg-gray-50 hover:bg-emerald-50 border border-gray-100 rounded-2xl flex justify-between items-center cursor-pointer transition-all active:scale-98">
+                    <div>
+                        <h5 class="font-bold text-gray-900 text-sm">${p.name}</h5>
+                        <p class="text-[11px] text-gray-400 font-medium">Lagerbestand: ${p.stock ?? 0}</p>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        function selectVerkaufProduct(name, currentStock) {
+            selectedVerkaufProduct = { name, currentStock };
+            document.getElementById('verkauf-selected-name').innerText = name;
+            document.getElementById('verkauf-selected-stock').innerText = `Verfügbar: ${currentStock}`;
+            document.getElementById('verkauf-booking-form').classList.remove('hidden');
+        }
+
+        async function submitVerkaufBooking() {
+            const mengeInput = document.getElementById('verkauf-quantity');
+            const menge = parseInt(mengeInput.value);
+
+            if (isNaN(menge) || menge <= 0 || !selectedVerkaufProduct) {
+                alert("Bitte gib eine gültige Menge ein.");
+                return;
+            }
+
+            if (menge > selectedVerkaufProduct.currentStock) {
+                alert("Verkaufsmenge ist größer als der Lagerbestand!");
+                return;
+            }
+
+            const neuerBestand = selectedVerkaufProduct.currentStock - menge;
+            await updateStockByName(selectedVerkaufProduct.name, neuerBestand);
+            
+            mengeInput.value = '';
+            closeVerkaufModal();
+            alert(`Erfolgreich ${menge}x ${selectedVerkaufProduct.name} als verkauft verbucht.`);
         }
 
         async function updateStockByName(prodName, newStock) {
@@ -811,6 +1002,8 @@
                     </div>
                 </div>
             `).join('');
+
+            lucide.createIcons();
         }
 
         function selectQuickProduct(name, currentStock) {
