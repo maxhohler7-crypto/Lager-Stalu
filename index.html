@@ -98,7 +98,6 @@
                 <span class="text-[10px] font-semibold mt-1">Lager</span>
             </button>
             
-            <!-- Wareneingang Button mit Scanner Icon -->
             <button onclick="openQuickAddModal()" class="flex flex-col items-center justify-center -mt-5 transition-all active:scale-90">
                 <div class="w-13 h-13 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-3.5 rounded-full shadow-lg shadow-blue-500/40 border-4 border-gray-100 flex items-center justify-center">
                     <i data-lucide="scan-barcode" class="w-6 h-6"></i>
@@ -167,7 +166,10 @@
             <div id="quick-booking-form" class="hidden pt-3 border-t border-gray-100 space-y-3 bg-blue-50/50 p-3 rounded-2xl">
                 <div class="flex justify-between items-center">
                     <span id="selected-product-name" class="font-bold text-sm text-gray-900"></span>
-                    <span id="selected-product-stock" class="text-xs text-gray-500"></span>
+                    <div class="text-right text-xs text-gray-500">
+                        <div id="selected-product-stock"></div>
+                        <div id="selected-product-extra" class="text-[10px] text-gray-400"></div>
+                    </div>
                 </div>
                 <div class="flex space-x-2">
                     <input type="number" id="quick-quantity" placeholder="+ Menge (z.B. 100)" class="flex-1 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
@@ -365,27 +367,52 @@
             list.innerHTML = boxProducts.map(p => {
                 const isLow = isProductLow(p);
                 const min = p.min_stock ?? 5;
+                const reklas = p.reklamations_count ?? 0;
+                const auftraege = p.auftrags_count ?? 0;
+
                 return `
-                    <div class="bg-white p-4 rounded-3xl shadow-sm border ${isLow ? 'border-amber-300 bg-amber-50/20' : 'border-gray-100'} flex items-center justify-between">
-                        <div>
+                    <div class="bg-white p-4 rounded-3xl shadow-sm border ${isLow ? 'border-amber-300 bg-amber-50/20' : 'border-gray-100'} flex flex-col space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <h4 class="font-bold text-gray-900 text-sm">${p.name}</h4>
+                                    ${isLow ? '<span class="text-[10px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Gering</span>' : ''}
+                                </div>
+                                <p class="text-xs text-gray-400 font-medium mt-0.5">
+                                    Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span>
+                                    <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
+                                </p>
+                                ${p.barcode ? `<p class="text-[10px] text-indigo-500 font-mono mt-0.5">Code: ${p.barcode}</p>` : ''}
+                            </div>
                             <div class="flex items-center space-x-2">
-                                <h4 class="font-bold text-gray-900 text-sm">${p.name}</h4>
-                                ${isLow ? '<span class="text-[10px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Gering</span>' : ''}
+                                <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
+                                    <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
+                                    <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
+                                </div>
+                                <button onclick="deleteProduct('${p.id}', '${p.name}')" class="w-9 h-9 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all flex items-center justify-center ml-1">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
                             </div>
-                            <p class="text-xs text-gray-400 font-medium mt-0.5">
-                                Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span>
-                                <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
-                            </p>
-                            ${p.barcode ? `<p class="text-[10px] text-indigo-500 font-mono mt-0.5">Code: ${p.barcode}</p>` : ''}
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
-                                <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
-                                <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
+
+                        <!-- Zusätzliche Felder: Reklamation & Aufträge -->
+                        <div class="pt-2 border-t border-gray-100 flex items-center justify-between text-xs font-medium text-gray-600">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-amber-600">Rekla:</span>
+                                <div class="flex items-center space-x-1 bg-amber-50 px-2 py-1 rounded-lg">
+                                    <button onclick="updateFieldByName('${p.name}', 'reklamations_count', ${reklas - 1})" class="w-5 h-5 bg-white rounded flex items-center justify-center font-bold text-amber-700 shadow-xs">-</button>
+                                    <span class="font-bold px-1 text-amber-800">${reklas}</span>
+                                    <button onclick="updateFieldByName('${p.name}', 'reklamations_count', ${reklas + 1})" class="w-5 h-5 bg-white rounded flex items-center justify-center font-bold text-amber-700 shadow-xs">+</button>
+                                </div>
                             </div>
-                            <button onclick="deleteProduct('${p.id}', '${p.name}')" class="w-9 h-9 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all flex items-center justify-center ml-1">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-indigo-600">Aufträge:</span>
+                                <div class="flex items-center space-x-1 bg-indigo-50 px-2 py-1 rounded-lg">
+                                    <button onclick="updateFieldByName('${p.name}', 'auftrags_count', ${auftraege - 1})" class="w-5 h-5 bg-white rounded flex items-center justify-center font-bold text-indigo-700 shadow-xs">-</button>
+                                    <span class="font-bold px-1 text-indigo-800">${auftraege}</span>
+                                    <button onclick="updateFieldByName('${p.name}', 'auftrags_count', ${auftraege + 1})" class="w-5 h-5 bg-white rounded flex items-center justify-center font-bold text-indigo-700 shadow-xs">+</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -399,6 +426,18 @@
             const { error } = await db.from('products').update({ stock: newStock }).eq('name', prodName);
             if (!error) {
                 logActivity(`hat Bestand von "${prodName}" global auf ${newStock} geändert`);
+                fetchProducts();
+            }
+        }
+
+        async function updateFieldByName(prodName, field, newValue) {
+            if (newValue < 0) return;
+            const updateObj = {};
+            updateObj[field] = newValue;
+            const { error } = await db.from('products').update(updateObj).eq('name', prodName);
+            if (!error) {
+                const label = field === 'reklamations_count' ? 'Reklamationen' : 'Aufträge';
+                logActivity(`hat ${label} von "${prodName}" auf ${newValue} geändert`);
                 fetchProducts();
             }
         }
@@ -450,7 +489,7 @@
             const foundProduct = allProducts.find(p => p.barcode === barcodeText || p.name.toLowerCase() === barcodeText.toLowerCase());
 
             if (foundProduct) {
-                selectQuickProduct(foundProduct.name, foundProduct.stock ?? 0);
+                selectQuickProduct(foundProduct.name, foundProduct.stock ?? 0, foundProduct.reklamations_count ?? 0, foundProduct.auftrags_count ?? 0);
             } else {
                 alert(`Barcode "${barcodeText}" wurde keinem Produkt zugeordnet.`);
                 document.getElementById('quick-search').value = barcodeText;
@@ -495,7 +534,7 @@
             }
 
             list.innerHTML = filtered.map(p => `
-                <div onclick="selectQuickProduct('${p.name}', ${p.stock ?? 0})" class="p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-2xl flex justify-between items-center cursor-pointer transition-all active:scale-98">
+                <div onclick="selectQuickProduct('${p.name}', ${p.stock ?? 0}, ${p.reklamations_count ?? 0}, ${p.auftrags_count ?? 0})" class="p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-2xl flex justify-between items-center cursor-pointer transition-all active:scale-98">
                     <div>
                         <h5 class="font-bold text-gray-900 text-sm">${p.name}</h5>
                         <p class="text-[11px] text-gray-400 font-medium">
@@ -503,17 +542,21 @@
                             ${p.barcode ? ` | Code: ${p.barcode}` : ''}
                         </p>
                     </div>
-                    <span class="text-xs font-bold text-gray-600 bg-white px-2.5 py-1 rounded-xl border border-gray-200">
-                        Aktuell: ${p.stock ?? 0}
-                    </span>
+                    <div class="text-right">
+                        <span class="text-xs font-bold text-gray-600 bg-white px-2.5 py-1 rounded-xl border border-gray-200">
+                            Aktuell: ${p.stock ?? 0}
+                        </span>
+                        <div class="text-[10px] text-gray-400 mt-1">Rekla: ${p.reklamations_count ?? 0} | Aufträge: ${p.auftrags_count ?? 0}</div>
+                    </div>
                 </div>
             `).join('');
         }
 
-        function selectQuickProduct(name, currentStock) {
+        function selectQuickProduct(name, currentStock, reklas = 0, auftraege = 0) {
             selectedQuickProduct = { name, currentStock };
             document.getElementById('selected-product-name').innerText = name;
             document.getElementById('selected-product-stock').innerText = `Aktueller Bestand: ${currentStock}`;
+            document.getElementById('selected-product-extra').innerText = `Rekla: ${reklas} | Aufträge: ${auftraege}`;
             document.getElementById('quick-quantity').value = '';
             document.getElementById('quick-booking-form').classList.remove('hidden');
             document.getElementById('quick-quantity').focus();
@@ -551,6 +594,8 @@
                     <input type="text" id="input-name" placeholder="Produktname" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="input-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="input-barcode" placeholder="Barcode (Optional)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="input-rekla" placeholder="Reklamationen (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="input-auftraege" placeholder="Aufträge (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
             } else {
                 title.innerText = `Neues Produkt in ${activeBox}`;
@@ -558,6 +603,8 @@
                     <input type="text" id="input-name" placeholder="Produktname" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="input-stock" placeholder="Anfangsbestand" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="input-barcode" placeholder="Barcode (Optional)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="input-rekla" placeholder="Reklamationen (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="input-auftraege" placeholder="Aufträge (Standard 0)" class="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 `;
             }
             document.getElementById('add-modal').classList.remove('hidden');
@@ -571,11 +618,20 @@
             const name = document.getElementById('input-name')?.value.trim();
             const stock = parseInt(document.getElementById('input-stock')?.value) || 0;
             const barcode = document.getElementById('input-barcode')?.value.trim() || null;
+            const reklas = parseInt(document.getElementById('input-rekla')?.value) || 0;
+            const auftraege = parseInt(document.getElementById('input-auftraege')?.value) || 0;
             const box = activeBox || document.getElementById('input-box')?.value.trim() || 'Allgemein';
 
             if (!name) return alert("Bitte einen Produktnamen eingeben.");
 
-            const { error } = await db.from('products').insert([{ name, stock, category: box, barcode }]);
+            const { error } = await db.from('products').insert([{ 
+                name, 
+                stock, 
+                category: box, 
+                barcode, 
+                reklamations_count: reklas, 
+                auftrags_count: auftraege 
+            }]);
 
             if (error) {
                 alert("Fehler beim Speichern: " + error.message);
