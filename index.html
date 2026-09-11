@@ -73,7 +73,7 @@
                 </div>
             </div>
             <div class="flex items-center space-x-2">
-                <button id="add-btn" onclick="openAddModal()" class="w-9 h-9 bg-blue-600 hover:bg-blue-700 active:scale-90 text-white rounded-full flex items-center justify-center shadow-md shadow-blue-500/30 transition-all">
+                <button id="add-btn" onclick="handlePlusButtonClick()" class="w-9 h-9 bg-blue-600 hover:bg-blue-700 active:scale-90 text-white rounded-full flex items-center justify-center shadow-md shadow-blue-500/30 transition-all">
                     <i data-lucide="plus" class="w-5 h-5"></i>
                 </button>
                 <button onclick="logout()" class="w-9 h-9 bg-gray-100 hover:bg-gray-200 active:scale-90 text-gray-500 rounded-full flex items-center justify-center transition-all">
@@ -126,7 +126,60 @@
         </nav>
     </div>
 
-    <!-- Modal: Wareneingang & Barcode Scanner -->
+    <!-- Modal 1: Produkt hinzufügen (Lager) -->
+    <div id="add-product-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                <h3 class="text-lg font-bold text-gray-900">Neues Produkt erstellen</h3>
+                <button onclick="closeProductModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <form onsubmit="saveNewProduct(event)" class="space-y-3">
+                <input type="text" id="new-prod-name" placeholder="Produktname" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="new-prod-box" placeholder="Kiste / Kategorie (z.B. Kiste A)" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="flex space-x-2">
+                    <input type="number" id="new-prod-stock" placeholder="Anfangsbestand" required class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="new-prod-min" placeholder="Mindestbestand" value="5" class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <input type="text" id="new-prod-barcode" placeholder="Barcode / EAN (Optional)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-blue-500/20">Produkt Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Auftrag hinzufügen -->
+    <div id="add-auftrag-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                <h3 class="text-lg font-bold text-gray-900">Neuen Auftrag anlegen</h3>
+                <button onclick="closeAuftragModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <form onsubmit="saveNewAuftrag(event)" class="space-y-3">
+                <input type="text" id="auftrag-title" placeholder="Auftragsnummer / Titel" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                <input type="text" id="auftrag-produkt" placeholder="Produktname" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                <input type="text" id="auftrag-image" placeholder="Bild-URL (Optional)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm shadow-md">Auftrag Erstellen</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Reklamation hinzufügen -->
+    <div id="add-rekla-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                <h3 class="text-lg font-bold text-gray-900">Neue Reklamation melden</h3>
+                <button onclick="closeReklaModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <form onsubmit="saveNewRekla(event)" class="space-y-3">
+                <input type="text" id="rekla-title" placeholder="Reklamations-Nr / Titel" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                <input type="text" id="rekla-produkt" placeholder="Betroffenes Produkt" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                <textarea id="rekla-grund" placeholder="Grund / Beschreibung des Mangels" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white h-20"></textarea>
+                <input type="text" id="rekla-image" placeholder="Bild-URL des Schadens (Optional)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                <button type="submit" class="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-sm shadow-md">Reklamation Einreichen</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 4: Wareneingang & Barcode Scanner -->
     <div id="quick-add-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 transition-all">
         <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center pb-1 border-b border-gray-100">
@@ -137,7 +190,6 @@
                 <button onclick="closeQuickAddModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
 
-            <!-- Kamera Scanner Bereich -->
             <div id="scanner-container" class="hidden relative rounded-2xl overflow-hidden bg-black min-h-[200px]">
                 <div id="reader" class="w-full"></div>
                 <button onclick="stopScanner()" class="absolute top-2 right-2 bg-black/60 text-white px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md">Kamera schließen</button>
@@ -148,22 +200,18 @@
                 <span class="text-sm">Barcode mit Kamera scannen</span>
             </button>
 
-            <!-- Suchfeld -->
             <div class="relative">
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
                 <input type="text" id="quick-search" oninput="filterQuickAddList()" placeholder="Produkt oder Strichcode..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
             </div>
 
-            <!-- Produktliste -->
             <div id="quick-product-list" class="flex-1 overflow-y-auto space-y-2 pr-1 my-2"></div>
 
-            <!-- Eingabebereich für gewählte Ware -->
             <div id="quick-booking-form" class="hidden pt-3 border-t border-gray-100 space-y-3 bg-blue-50/50 p-3 rounded-2xl">
                 <div class="flex justify-between items-center">
                     <span id="selected-product-name" class="font-bold text-sm text-gray-900"></span>
                     <div class="text-right text-xs text-gray-500">
                         <div id="selected-product-stock"></div>
-                        <div id="selected-product-extra" class="text-[10px] text-gray-400"></div>
                     </div>
                 </div>
                 <div class="flex space-x-2">
@@ -179,15 +227,14 @@
     <script>
         let allProducts = [];
         
-        // Musterdaten für Aufträge und Reklamationen
         let sampleAuftraege = [
-            { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", erledigt: false },
-            { id: 102, name: "Auftrag #A-102", produkt: "Musterprodukt B", erledigt: true }
+            { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=300", erledigt: false },
+            { id: 102, name: "Auftrag #A-102", produkt: "Musterprodukt B", image: "", erledigt: true }
         ];
 
         let sampleReklamationen = [
-            { id: 1, name: "Reklamation #R-201", produkt: "Musterprodukt A", grund: "Verpackung beschädigt", status: "In Bearbeitung" },
-            { id: 2, name: "Reklamation #R-202", produkt: "Musterprodukt B", grund: "Falsche Lieferung", status: "Neu" }
+            { id: 1, name: "Reklamation #R-201", produkt: "Musterprodukt A", grund: "Verpackung beschädigt", image: "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?w=300", status: "In Bearbeitung" },
+            { id: 2, name: "Reklamation #R-202", produkt: "Musterprodukt B", grund: "Falsche Lieferung", image: "", status: "Neu" }
         ];
 
         let authMode = 'login';
@@ -268,10 +315,10 @@
                 addBtn.classList.remove('hidden');
                 fetchProducts();
             } else if (tab === 'auftraege') {
-                addBtn.classList.add('hidden');
+                addBtn.classList.remove('hidden');
                 openAuftragsPortal();
             } else if (tab === 'reklamationen') {
-                addBtn.classList.add('hidden');
+                addBtn.classList.remove('hidden');
                 openReklamationsPortal();
             } else if (tab === 'mitarbeiter') {
                 addBtn.classList.add('hidden');
@@ -279,6 +326,75 @@
                 document.getElementById('header-title').innerText = "Mitarbeiter";
                 document.getElementById('content-list').innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Mitarbeiterverwaltung</div>`;
             }
+        }
+
+        // Steuert das Plus-Icon oben rechts im Header je nach aktivem Tab
+        function handlePlusButtonClick() {
+            if (currentTab === 'lager') {
+                document.getElementById('add-product-modal').classList.remove('hidden');
+            } else if (currentTab === 'auftraege') {
+                document.getElementById('add-auftrag-modal').classList.remove('hidden');
+            } else if (currentTab === 'reklamationen') {
+                document.getElementById('add-rekla-modal').classList.remove('hidden');
+            }
+        }
+
+        function closeProductModal() { document.getElementById('add-product-modal').classList.add('hidden'); }
+        function closeAuftragModal() { document.getElementById('add-auftrag-modal').classList.add('hidden'); }
+        function closeReklaModal() { document.getElementById('add-rekla-modal').classList.add('hidden'); }
+
+        async function saveNewProduct(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-prod-name').value;
+            const category = document.getElementById('new-prod-box').value;
+            const stock = parseInt(document.getElementById('new-prod-stock').value) || 0;
+            const min_stock = parseInt(document.getElementById('new-prod-min').value) || 5;
+            const barcode = document.getElementById('new-prod-barcode').value;
+
+            const { error } = await db.from('products').insert([{ name, category, stock, min_stock, barcode }]);
+            if (error) alert("Fehler: " + error.message);
+            else {
+                closeProductModal();
+                fetchProducts();
+            }
+        }
+
+        function saveNewAuftrag(e) {
+            e.preventDefault();
+            const title = document.getElementById('auftrag-title').value;
+            const produkt = document.getElementById('auftrag-produkt').value;
+            const image = document.getElementById('auftrag-image').value;
+
+            sampleAuftraege.unshift({
+                id: Date.now(),
+                name: title,
+                produkt: produkt,
+                image: image,
+                erledigt: false
+            });
+
+            closeAuftragModal();
+            openAuftragsPortal();
+        }
+
+        function saveNewRekla(e) {
+            e.preventDefault();
+            const title = document.getElementById('rekla-title').value;
+            const produkt = document.getElementById('rekla-produkt').value;
+            const grund = document.getElementById('rekla-grund').value;
+            const image = document.getElementById('rekla-image').value;
+
+            sampleReklamationen.unshift({
+                id: Date.now(),
+                name: title,
+                produkt: produkt,
+                grund: grund,
+                image: image,
+                status: "Neu"
+            });
+
+            closeReklaModal();
+            openReklamationsPortal();
         }
 
         function isProductLow(p) {
@@ -401,7 +517,6 @@
                             </div>
                         </div>
 
-                        <!-- Buttons zum Öffnen der separaten Portale für dieses Produkt -->
                         <div class="pt-2 border-t border-gray-100 flex space-x-2">
                             <button onclick="openReklamationsPortal('${p.name}')" class="flex-1 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 transition-all">
                                 <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
@@ -432,47 +547,36 @@
             let html = `
                 <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-4">
                     <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-gray-900">Auftragsübersicht</h3>
+                        <h3 class="font-bold text-gray-900">Aufträge</h3>
                         ${filterProduktName ? `<span class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded-lg">${filterProduktName}</span>` : ''}
                     </div>
                     
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
-                            <thead>
-                                <tr class="border-b border-gray-100 text-gray-400">
-                                    <th class="pb-2">Status</th>
-                                    <th class="pb-2">Auftrag</th>
-                                    <th class="pb-2">Produkt</th>
-                                    <th class="pb-2 text-right">Löschen</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-50">
+                    <div class="space-y-3">
             `;
 
             if (gefilterteAuftraege.length === 0) {
-                html += `<tr><td colspan="4" class="py-4 text-center text-gray-400">Keine Aufträge vorhanden.</td></tr>`;
+                html += `<div class="py-4 text-center text-gray-400 text-xs">Keine Aufträge vorhanden.</div>`;
             } else {
                 gefilterteAuftraege.forEach(auftrag => {
                     html += `
-                        <tr class="hover:bg-gray-50/50">
-                            <td class="py-3">
-                                <input type="checkbox" ${auftrag.erledigt ? 'checked' : ''} onchange="toggleAuftragErledigt(${auftrag.id})" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
-                            </td>
-                            <td class="py-3 font-semibold ${auftrag.erledigt ? 'line-through-text' : 'text-gray-800'}">${auftrag.name}</td>
-                            <td class="py-3 ${auftrag.erledigt ? 'line-through-text' : 'text-gray-600'}">${auftrag.produkt}</td>
-                            <td class="py-3 text-right">
-                                <button onclick="deleteAuftrag(${auftrag.id})" class="text-red-500 hover:text-red-700 p-1">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
-                            </td>
-                        </tr>
+                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" ${auftrag.erledigt ? 'checked' : ''} onchange="toggleAuftragErledigt(${auftrag.id})" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                                ${auftrag.image ? `<img src="${auftrag.image}" class="w-10 h-10 rounded-xl object-cover border border-gray-200">` : ''}
+                                <div>
+                                    <h5 class="font-bold text-gray-800 text-xs ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.name}</h5>
+                                    <p class="text-[11px] text-gray-500 ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.produkt}</p>
+                                </div>
+                            </div>
+                            <button onclick="deleteAuftrag(${auftrag.id})" class="text-red-500 hover:text-red-700 p-2">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     `;
                 });
             }
 
             html += `
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             `;
@@ -509,7 +613,7 @@
                         ${filterProduktName ? `<span class="text-xs text-amber-600 font-semibold bg-amber-50 px-2 py-1 rounded-lg">${filterProduktName}</span>` : ''}
                     </div>
                     
-                    <div class="space-y-2">
+                    <div class="space-y-3">
             `;
 
             if (gefilterteReklas.length === 0) {
@@ -517,12 +621,16 @@
             } else {
                 gefilterteReklas.forEach(rekla => {
                     html += `
-                        <div class="p-3 bg-amber-50/40 border border-amber-100 rounded-2xl flex justify-between items-center">
-                            <div>
-                                <h5 class="font-bold text-gray-800 text-xs">${rekla.name} - ${rekla.produkt}</h5>
-                                <p class="text-[11px] text-gray-500 mt-0.5">${rekla.grund}</p>
+                        <div class="p-3 bg-amber-50/40 border border-amber-100 rounded-2xl space-y-2">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h5 class="font-bold text-gray-800 text-xs">${rekla.name}</h5>
+                                    <p class="text-[11px] font-semibold text-amber-800">${rekla.produkt}</p>
+                                </div>
+                                <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded-lg">${rekla.status}</span>
                             </div>
-                            <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded-lg">${rekla.status}</span>
+                            <p class="text-xs text-gray-600">${rekla.grund}</p>
+                            ${rekla.image ? `<img src="${rekla.image}" class="w-full h-32 rounded-xl object-cover border border-amber-200 mt-2">` : ''}
                         </div>
                     `;
                 });
