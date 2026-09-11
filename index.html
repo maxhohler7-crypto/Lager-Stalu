@@ -146,7 +146,7 @@
         </div>
     </div>
 
-    <!-- Modal 2: Auftrag hinzufügen (inkl. Stückzahl) -->
+    <!-- Modal 2: Auftrag hinzufügen -->
     <div id="add-auftrag-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -245,13 +245,13 @@
         </div>
     </div>
 
-    <!-- Modal 5: Verlauf (über Team geöffnet) -->
+    <!-- Modal 5: Verlaufs-Portal -->
     <div id="verlauf-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
                 <div>
                     <h3 class="text-lg font-bold text-gray-900">Aktivitäten-Verlauf</h3>
-                    <p class="text-xs text-gray-400">Historie aller Lageraktionen</p>
+                    <p class="text-xs text-gray-400">Wer hat wann was geändert?</p>
                 </div>
                 <button onclick="closeVerlaufModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
@@ -275,9 +275,7 @@
             { id: 1, name: "Reklamation #R-201", produkt: "Musterprodukt A", grund: "Verpackung beschädigt", image: "", status: "In Bearbeitung" }
         ];
 
-        let sampleVerlauf = [
-            { id: 1, user: "admin@lager.de", action: "Wareneingang gebucht", details: "+10 Stk. Musterprodukt A", time: "Vor 10 Min." }
-        ];
+        let globalVerlauf = [];
 
         let authMode = 'login';
         let activeBox = null;
@@ -292,6 +290,7 @@
         window.onload = async () => {
             lucide.createIcons();
             setupImageUploadListeners();
+            loadVerlaufFromStorage();
 
             const { data: { session } } = await db.auth.getSession();
             if (session) showApp(session.user);
@@ -302,15 +301,51 @@
             });
         };
 
-        function addVerlaufEntry(action, details) {
-            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            sampleVerlauf.unshift({
+        // --- VERLAUFS-LOGIK (Supabase + LocalStorage Backup) ---
+        function loadVerlaufFromStorage() {
+            try {
+                const stored = localStorage.getItem('lager_verlauf_backup');
+                if (stored) globalVerlauf = JSON.parse(stored);
+            } catch(e) {}
+        }
+
+        async function addVerlaufEntry(action, details) {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            const userEmail = currentUser ? currentUser.email : 'Unbekannter Nutzer';
+
+            const newEntry = {
                 id: Date.now(),
-                user: currentUser ? currentUser.email : 'System',
+                user_email: userEmail,
                 action: action,
                 details: details,
-                time: timeStr
-            });
+                timestamp: `${dateStr} um ${timeStr}`
+            };
+
+            globalVerlauf.unshift(newEntry);
+            localStorage.setItem('lager_verlauf_backup', JSON.stringify(globalVerlauf));
+
+            // Versuche Supabase-Datenbank-Speicherung
+            try {
+                await db.from('history').insert([{
+                    user_email: userEmail,
+                    action: action,
+                    details: details,
+                    timestamp: `${dateStr} um ${timeStr}`
+                }]);
+            } catch(err) {
+                console.log("Hinweis: Supabase history Tabelle nicht aktiv, Speicher in lokalem Verlauf.");
+            }
+        }
+
+        async function fetchVerlauf() {
+            try {
+                const { data, error } = await db.from('history').select('*').order('created_at', { ascending: false });
+                if (!error && data && data.length > 0) {
+                    globalVerlauf = data;
+                }
+            } catch(e) {}
         }
 
         function setupImageUploadListeners() {
@@ -385,6 +420,7 @@
 
         function switchTab(tab) {
             currentTab = tab;
+            activeBox = null;
             
             ['lager', 'auftraege', 'reklamationen', 'mitarbeiter'].forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
@@ -396,22 +432,31 @@
             });
 
             const addBtn = document.getElementById('add-btn');
+            const backBtn = document.getElementById('back-btn');
 
             if (tab === 'lager') {
                 addBtn.classList.remove('hidden');
+                backBtn.classList.add('hidden');
                 fetchProducts();
             } else if (tab === 'auftraege') {
                 addBtn.classList.remove('hidden');
+                backBtn.classList.remove('hidden');
                 openAuftragsPortal();
             } else if (tab === 'reklamationen') {
                 addBtn.classList.remove('hidden');
+                backBtn.classList.remove('hidden');
                 openReklamationsPortal();
             } else if (tab === 'mitarbeiter') {
                 addBtn.classList.add('hidden');
-                document.getElementById('back-btn').classList.add('hidden');
+                backBtn.classList.remove('hidden');
                 document.getElementById('header-title').innerText = "Team";
                 renderTeamScreen();
             }
+        }
+
+        // --- ZURÜCK-BUTTON FUNKTION ---
+        function showBoxOverview() {
+            switchTab('lager');
         }
 
         function handlePlusButtonClick() {
@@ -447,7 +492,7 @@
             const { error } = await db.from('products').insert([{ name, category, stock, min_stock, barcode }]);
             if (error) alert("Fehler: " + error.message);
             else {
-                addVerlaufEntry("Produkt erstellt", `${name} (${stock} Stk.) in ${category}`);
+                addVerlaufEntry("Neues Produkt erstellt", `"${name}" (${stock} Stk.) in Kiste "${category}"`);
                 closeProductModal();
                 fetchProducts();
             }
@@ -469,7 +514,7 @@
                 erledigt: false
             });
 
-            addVerlaufEntry("Auftrag angelegt", `${title} - ${targetQuantity}x ${produkt}`);
+            addVerlaufEntry("Auftrag angelegt", `"${title}" - Ziel: ${targetQuantity}x ${produkt}`);
             closeAuftragModal();
             openAuftragsPortal();
         }
@@ -489,7 +534,7 @@
                 status: "Neu"
             });
 
-            addVerlaufEntry("Reklamation gemeldet", `${title} (${produkt})`);
+            addVerlaufEntry("Reklamation gemeldet", `"${title}" für ${produkt}`);
             closeReklaModal();
             openReklamationsPortal();
         }
@@ -528,7 +573,7 @@
 
         function renderBoxes() {
             activeBox = null;
-            document.getElementById('header-title').innerText = "Kisten";
+            document.getElementById('header-title').innerText = "Lager / Kisten";
             document.getElementById('back-btn').classList.add('hidden');
             
             const list = document.getElementById('content-list');
@@ -571,10 +616,6 @@
             document.getElementById('header-title').innerText = boxName;
             document.getElementById('back-btn').classList.remove('hidden');
             renderProductsInBox(boxName);
-        }
-
-        function showBoxOverview() {
-            switchTab('lager');
         }
 
         function renderProductsInBox(boxName) {
@@ -631,7 +672,7 @@
             lucide.createIcons();
         }
 
-        // --- AUFTRAGS-PORTAL (Mit Produktionsfortschritt) ---
+        // --- AUFTRAGS-PORTAL ---
         function openAuftragsPortal(filterProduktName = null) {
             document.getElementById('header-title').innerText = "Auftrags-Portal";
             document.getElementById('back-btn').classList.remove('hidden');
@@ -669,7 +710,6 @@
                                 </button>
                             </div>
 
-                            <!-- Produktions-Zähler -->
                             <div class="bg-white p-2.5 rounded-xl border border-gray-200/80 flex justify-between items-center">
                                 <div>
                                     <span class="text-[11px] font-semibold text-gray-400 block">Produktionsfortschritt</span>
@@ -702,7 +742,7 @@
             sampleAuftraege = sampleAuftraege.map(a => {
                 if (a.id === id) {
                     const newQty = Math.max(0, a.producedQuantity + delta);
-                    addVerlaufEntry("Produktion aktualisiert", `${a.name}: ${newQty}/${a.targetQuantity} Stk.`);
+                    addVerlaufEntry("Produktion angepasst", `${a.name}: ${a.producedQuantity} -> ${newQty} Stk.`);
                     return {
                         ...a,
                         producedQuantity: newQty,
@@ -716,6 +756,8 @@
 
         function deleteAuftrag(id) {
             if(!confirm("Auftrag wirklich löschen?")) return;
+            const target = sampleAuftraege.find(a => a.id === id);
+            if(target) addVerlaufEntry("Auftrag gelöscht", target.name);
             sampleAuftraege = sampleAuftraege.filter(a => a.id !== id);
             openAuftragsPortal();
         }
@@ -773,8 +815,7 @@
         async function renderTeamScreen() {
             const list = document.getElementById('content-list');
             
-            // Lade angemeldete Nutzer/Profile aus Supabase
-            const { data: profiles, error } = await db.from('profiles').select('*');
+            const { data: profiles } = await db.from('profiles').select('*');
 
             let html = `
                 <div class="space-y-4">
@@ -789,7 +830,7 @@
                         <h3 class="font-bold text-gray-900 text-sm border-b border-gray-100 pb-2">Registriertes Team</h3>
             `;
 
-            if (error || !profiles || profiles.length === 0) {
+            if (!profiles || profiles.length === 0) {
                 html += `<div class="p-3 text-xs text-gray-400 text-center">Keine Mitarbeiter gefunden.</div>`;
             } else {
                 profiles.forEach(p => {
@@ -821,7 +862,8 @@
         }
 
         // --- VERLAUFS-PORTAL MODAL LOGIK ---
-        function openVerlaufModal() {
+        async function openVerlaufModal() {
+            await fetchVerlauf();
             renderVerlaufList();
             document.getElementById('verlauf-modal').classList.remove('hidden');
         }
@@ -833,33 +875,43 @@
         function renderVerlaufList() {
             const list = document.getElementById('verlauf-list');
 
-            if (sampleVerlauf.length === 0) {
+            if (globalVerlauf.length === 0) {
                 list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Noch keine Aktivitäten vorhanden.</div>`;
                 return;
             }
 
-            list.innerHTML = sampleVerlauf.map(item => `
+            list.innerHTML = globalVerlauf.map(item => `
                 <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl space-y-1">
                     <div class="flex justify-between items-center">
                         <span class="text-xs font-bold text-gray-900">${item.action}</span>
-                        <span class="text-[10px] text-gray-400 font-medium">${item.time}</span>
+                        <span class="text-[10px] text-gray-400 font-medium">${item.timestamp || ''}</span>
                     </div>
                     <p class="text-xs text-gray-600 font-medium">${item.details}</p>
-                    <div class="text-[10px] text-indigo-600 font-semibold pt-1">${item.user}</div>
+                    <div class="text-[10px] text-blue-600 font-bold pt-1 flex items-center space-x-1">
+                        <i data-lucide="user" class="w-3 h-3 inline"></i>
+                        <span>${item.user_email || item.user || 'Unbekannt'}</span>
+                    </div>
                 </div>
             `).join('');
+
+            lucide.createIcons();
         }
 
         async function updateStockByName(prodName, newStock) {
             if (newStock < 0) return;
+            
+            const prod = allProducts.find(p => p.name === prodName);
+            const oldStock = prod ? prod.stock : '?';
+
             const { error } = await db.from('products').update({ stock: newStock }).eq('name', prodName);
             if (!error) {
+                addVerlaufEntry("Bestand geändert", `"${prodName}": ${oldStock} -> ${newStock} Stk.`);
                 fetchProducts();
             }
         }
 
         async function deleteProduct(id, prodName) {
-            if (!confirm(`Möchtest du "${prodName}" wirklich aus dieser Kiste löschen?`)) return;
+            if (!confirm(`Möchtest du "${prodName}" wirklich löschen?`)) return;
 
             const { error } = await db.from('products').delete().eq('id', id);
             if (error) {
@@ -983,7 +1035,7 @@
 
             const neuerBestand = selectedQuickProduct.currentStock + menge;
             await updateStockByName(selectedQuickProduct.name, neuerBestand);
-            addVerlaufEntry("Wareneingang gebucht", `+${menge} Stk. ${selectedQuickProduct.name}`);
+            addVerlaufEntry("Wareneingang gebucht", `+${menge} Stk. ${selectedQuickProduct.name} (${selectedQuickProduct.currentStock} -> ${neuerBestand} Stk.)`);
             
             mengeInput.value = '';
             closeQuickAddModal();
