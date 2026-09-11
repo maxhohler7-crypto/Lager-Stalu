@@ -156,13 +156,21 @@
             <form onsubmit="saveNewAuftrag(event)" class="space-y-3">
                 <input type="text" id="auftrag-title" placeholder="Auftragsnummer / Titel" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
                 <input type="text" id="auftrag-produkt" placeholder="Produktname" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
-                <input type="text" id="auftrag-image" placeholder="Bild-URL (Optional)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Foto aus Galerie/Kamera auswählen</label>
+                    <input type="file" id="auftrag-file-input" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                </div>
+                <div id="auftrag-image-preview-container" class="hidden">
+                    <img id="auftrag-image-preview" src="" class="w-full h-32 object-cover rounded-xl border border-gray-200">
+                </div>
+
                 <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm shadow-md">Auftrag Erstellen</button>
             </form>
         </div>
     </div>
 
-    <!-- Modal 3: Reklamation hinzufügen -->
+    <!-- Modal 3: Reklamation hinzufügen (mit Galerie/Kamera-Upload) -->
     <div id="add-rekla-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -173,7 +181,15 @@
                 <input type="text" id="rekla-title" placeholder="Reklamations-Nr / Titel" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
                 <input type="text" id="rekla-produkt" placeholder="Betroffenes Produkt" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
                 <textarea id="rekla-grund" placeholder="Grund / Beschreibung des Mangels" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white h-20"></textarea>
-                <input type="text" id="rekla-image" placeholder="Bild-URL des Schadens (Optional)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Foto aus Galerie/Kamera hochladen</label>
+                    <input type="file" id="rekla-file-input" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer">
+                </div>
+                <div id="rekla-image-preview-container" class="hidden">
+                    <img id="rekla-image-preview" src="" class="w-full h-32 object-cover rounded-xl border border-gray-200">
+                </div>
+
                 <button type="submit" class="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-sm shadow-md">Reklamation Einreichen</button>
             </form>
         </div>
@@ -228,13 +244,11 @@
         let allProducts = [];
         
         let sampleAuftraege = [
-            { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=300", erledigt: false },
-            { id: 102, name: "Auftrag #A-102", produkt: "Musterprodukt B", image: "", erledigt: true }
+            { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", image: "", erledigt: false }
         ];
 
         let sampleReklamationen = [
-            { id: 1, name: "Reklamation #R-201", produkt: "Musterprodukt A", grund: "Verpackung beschädigt", image: "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?w=300", status: "In Bearbeitung" },
-            { id: 2, name: "Reklamation #R-202", produkt: "Musterprodukt B", grund: "Falsche Lieferung", image: "", status: "Neu" }
+            { id: 1, name: "Reklamation #R-201", produkt: "Musterprodukt A", grund: "Verpackung beschädigt", image: "", status: "In Bearbeitung" }
         ];
 
         let authMode = 'login';
@@ -244,8 +258,13 @@
         let selectedQuickProduct = null;
         let html5QrcodeScanner = null;
 
+        let selectedReklaImageBase64 = "";
+        let selectedAuftragImageBase64 = "";
+
         window.onload = async () => {
             lucide.createIcons();
+            setupImageUploadListeners();
+
             const { data: { session } } = await db.auth.getSession();
             if (session) showApp(session.user);
 
@@ -254,6 +273,36 @@
                 else showAuth();
             });
         };
+
+        function setupImageUploadListeners() {
+            // Reklamations-Bild Listener
+            document.getElementById('rekla-file-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        selectedReklaImageBase64 = event.target.result;
+                        document.getElementById('rekla-image-preview').src = selectedReklaImageBase64;
+                        document.getElementById('rekla-image-preview-container').classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Auftrags-Bild Listener
+            document.getElementById('auftrag-file-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        selectedAuftragImageBase64 = event.target.result;
+                        document.getElementById('auftrag-image-preview').src = selectedAuftragImageBase64;
+                        document.getElementById('auftrag-image-preview-container').classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
 
         function showApp(user) {
             currentUser = user;
@@ -328,7 +377,6 @@
             }
         }
 
-        // Steuert das Plus-Icon oben rechts im Header je nach aktivem Tab
         function handlePlusButtonClick() {
             if (currentTab === 'lager') {
                 document.getElementById('add-product-modal').classList.remove('hidden');
@@ -340,8 +388,16 @@
         }
 
         function closeProductModal() { document.getElementById('add-product-modal').classList.add('hidden'); }
-        function closeAuftragModal() { document.getElementById('add-auftrag-modal').classList.add('hidden'); }
-        function closeReklaModal() { document.getElementById('add-rekla-modal').classList.add('hidden'); }
+        function closeAuftragModal() { 
+            document.getElementById('add-auftrag-modal').classList.add('hidden'); 
+            selectedAuftragImageBase64 = "";
+            document.getElementById('auftrag-image-preview-container').classList.add('hidden');
+        }
+        function closeReklaModal() { 
+            document.getElementById('add-rekla-modal').classList.add('hidden'); 
+            selectedReklaImageBase64 = "";
+            document.getElementById('rekla-image-preview-container').classList.add('hidden');
+        }
 
         async function saveNewProduct(e) {
             e.preventDefault();
@@ -363,13 +419,12 @@
             e.preventDefault();
             const title = document.getElementById('auftrag-title').value;
             const produkt = document.getElementById('auftrag-produkt').value;
-            const image = document.getElementById('auftrag-image').value;
 
             sampleAuftraege.unshift({
                 id: Date.now(),
                 name: title,
                 produkt: produkt,
-                image: image,
+                image: selectedAuftragImageBase64,
                 erledigt: false
             });
 
@@ -382,14 +437,13 @@
             const title = document.getElementById('rekla-title').value;
             const produkt = document.getElementById('rekla-produkt').value;
             const grund = document.getElementById('rekla-grund').value;
-            const image = document.getElementById('rekla-image').value;
 
             sampleReklamationen.unshift({
                 id: Date.now(),
                 name: title,
                 produkt: produkt,
                 grund: grund,
-                image: image,
+                image: selectedReklaImageBase64,
                 status: "Neu"
             });
 
@@ -559,18 +613,20 @@
             } else {
                 gefilterteAuftraege.forEach(auftrag => {
                     html += `
-                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <input type="checkbox" ${auftrag.erledigt ? 'checked' : ''} onchange="toggleAuftragErledigt(${auftrag.id})" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
-                                ${auftrag.image ? `<img src="${auftrag.image}" class="w-10 h-10 rounded-xl object-cover border border-gray-200">` : ''}
-                                <div>
-                                    <h5 class="font-bold text-gray-800 text-xs ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.name}</h5>
-                                    <p class="text-[11px] text-gray-500 ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.produkt}</p>
+                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex flex-col space-y-2">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <input type="checkbox" ${auftrag.erledigt ? 'checked' : ''} onchange="toggleAuftragErledigt(${auftrag.id})" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                                    <div>
+                                        <h5 class="font-bold text-gray-800 text-xs ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.name}</h5>
+                                        <p class="text-[11px] text-gray-500 ${auftrag.erledigt ? 'line-through-text' : ''}">${auftrag.produkt}</p>
+                                    </div>
                                 </div>
+                                <button onclick="deleteAuftrag(${auftrag.id})" class="text-red-500 hover:text-red-700 p-2">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
                             </div>
-                            <button onclick="deleteAuftrag(${auftrag.id})" class="text-red-500 hover:text-red-700 p-2">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
+                            ${auftrag.image ? `<img src="${auftrag.image}" class="w-full h-32 rounded-xl object-cover border border-gray-200">` : ''}
                         </div>
                     `;
                 });
