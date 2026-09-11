@@ -245,38 +245,22 @@
         </div>
     </div>
 
-    <!-- Modal 5: Verkaufen (über Team geöffnet) -->
-    <div id="verkauf-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <!-- Modal 5: Verlauf (über Team geöffnet) -->
+    <div id="verlauf-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-900">Verkaufs-Portal</h3>
-                    <p class="text-xs text-gray-400">Ware aus dem Lager verkaufen</p>
+                    <h3 class="text-lg font-bold text-gray-900">Aktivitäten-Verlauf</h3>
+                    <p class="text-xs text-gray-400">Historie aller Lageraktionen</p>
                 </div>
-                <button onclick="closeVerkaufModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+                <button onclick="closeVerlaufModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
 
-            <div class="relative">
-                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5"></i>
-                <input type="text" id="verkauf-search" oninput="filterVerkaufList()" placeholder="Produkt suchen..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-gray-100 border border-gray-200/60 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all">
-            </div>
+            <div id="verlauf-list" class="flex-1 overflow-y-auto space-y-2.5 pr-1 my-2"></div>
 
-            <div id="verkauf-product-list" class="flex-1 overflow-y-auto space-y-2 pr-1 my-2"></div>
-
-            <div id="verkauf-booking-form" class="hidden pt-3 border-t border-gray-100 space-y-3 bg-emerald-50/60 p-3 rounded-2xl">
-                <div class="flex justify-between items-center">
-                    <span id="verkauf-selected-name" class="font-bold text-sm text-gray-900"></span>
-                    <div class="text-right text-xs text-gray-500">
-                        <div id="verkauf-selected-stock"></div>
-                    </div>
-                </div>
-                <div class="flex space-x-2">
-                    <input type="number" id="verkauf-quantity" placeholder="Verkaufsmenge (z.B. 5)" class="flex-1 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
-                    <button onclick="submitVerkaufBooking()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold rounded-xl text-sm shadow-md shadow-emerald-500/20 transition-all">
-                        Verkaufen
-                    </button>
-                </div>
-            </div>
+            <button onclick="closeVerlaufModal()" class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl text-xs transition-all">
+                Schließen
+            </button>
         </div>
     </div>
 
@@ -291,12 +275,15 @@
             { id: 1, name: "Reklamation #R-201", produkt: "Musterprodukt A", grund: "Verpackung beschädigt", image: "", status: "In Bearbeitung" }
         ];
 
+        let sampleVerlauf = [
+            { id: 1, user: "admin@lager.de", action: "Wareneingang gebucht", details: "+10 Stk. Musterprodukt A", time: "Vor 10 Min." }
+        ];
+
         let authMode = 'login';
         let activeBox = null;
         let currentTab = 'lager';
         let currentUser = null;
         let selectedQuickProduct = null;
-        let selectedVerkaufProduct = null;
         let html5QrcodeScanner = null;
 
         let selectedReklaImageBase64 = "";
@@ -314,6 +301,17 @@
                 else showAuth();
             });
         };
+
+        function addVerlaufEntry(action, details) {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            sampleVerlauf.unshift({
+                id: Date.now(),
+                user: currentUser ? currentUser.email : 'System',
+                action: action,
+                details: details,
+                time: timeStr
+            });
+        }
 
         function setupImageUploadListeners() {
             document.getElementById('rekla-file-input').addEventListener('change', function(e) {
@@ -449,6 +447,7 @@
             const { error } = await db.from('products').insert([{ name, category, stock, min_stock, barcode }]);
             if (error) alert("Fehler: " + error.message);
             else {
+                addVerlaufEntry("Produkt erstellt", `${name} (${stock} Stk.) in ${category}`);
                 closeProductModal();
                 fetchProducts();
             }
@@ -470,6 +469,7 @@
                 erledigt: false
             });
 
+            addVerlaufEntry("Auftrag angelegt", `${title} - ${targetQuantity}x ${produkt}`);
             closeAuftragModal();
             openAuftragsPortal();
         }
@@ -489,6 +489,7 @@
                 status: "Neu"
             });
 
+            addVerlaufEntry("Reklamation gemeldet", `${title} (${produkt})`);
             closeReklaModal();
             openReklamationsPortal();
         }
@@ -701,6 +702,7 @@
             sampleAuftraege = sampleAuftraege.map(a => {
                 if (a.id === id) {
                     const newQty = Math.max(0, a.producedQuantity + delta);
+                    addVerlaufEntry("Produktion aktualisiert", `${a.name}: ${newQty}/${a.targetQuantity} Stk.`);
                     return {
                         ...a,
                         producedQuantity: newQty,
@@ -767,7 +769,7 @@
             lucide.createIcons();
         }
 
-        // --- TEAM & VERKAUF TAB ---
+        // --- TEAM TAB ---
         async function renderTeamScreen() {
             const list = document.getElementById('content-list');
             
@@ -776,10 +778,10 @@
 
             let html = `
                 <div class="space-y-4">
-                    <!-- Verkaufen Button -->
-                    <button onclick="openVerkaufModal()" class="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-3xl shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 active:scale-98 transition-all">
-                        <i data-lucide="shopping-bag" class="w-5 h-5"></i>
-                        <span>Verkaufs-Portal öffnen</span>
+                    <!-- Verlauf Button -->
+                    <button onclick="openVerlaufModal()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-3xl shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 active:scale-98 transition-all">
+                        <i data-lucide="history" class="w-5 h-5"></i>
+                        <span>Verlaufs-Portal öffnen</span>
                     </button>
 
                     <!-- Mitarbeiter Liste -->
@@ -818,78 +820,34 @@
             lucide.createIcons();
         }
 
-        // --- VERKAUFS-PORTAL MODAL LOGIK ---
-        function openVerkaufModal() {
-            selectedVerkaufProduct = null;
-            document.getElementById('verkauf-booking-form').classList.add('hidden');
-            document.getElementById('verkauf-search').value = '';
-            filterVerkaufList();
-            document.getElementById('verkauf-modal').classList.remove('hidden');
+        // --- VERLAUFS-PORTAL MODAL LOGIK ---
+        function openVerlaufModal() {
+            renderVerlaufList();
+            document.getElementById('verlauf-modal').classList.remove('hidden');
         }
 
-        function closeVerkaufModal() {
-            document.getElementById('verkauf-modal').classList.add('hidden');
+        function closeVerlaufModal() {
+            document.getElementById('verlauf-modal').classList.add('hidden');
         }
 
-        function filterVerkaufList() {
-            const query = document.getElementById('verkauf-search').value.toLowerCase();
-            const list = document.getElementById('verkauf-product-list');
+        function renderVerlaufList() {
+            const list = document.getElementById('verlauf-list');
 
-            const uniqueMap = new Map();
-            allProducts.forEach(p => {
-                if (!uniqueMap.has(p.name.toLowerCase())) {
-                    uniqueMap.set(p.name.toLowerCase(), p);
-                }
-            });
-            const uniqueProducts = Array.from(uniqueMap.values());
-
-            const filtered = uniqueProducts.filter(p => p.name.toLowerCase().includes(query));
-
-            if (filtered.length === 0) {
-                list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Keine Produkte vorhanden.</div>`;
+            if (sampleVerlauf.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Noch keine Aktivitäten vorhanden.</div>`;
                 return;
             }
 
-            list.innerHTML = filtered.map(p => `
-                <div onclick="selectVerkaufProduct('${p.name}', ${p.stock ?? 0})" class="p-3 bg-gray-50 hover:bg-emerald-50 border border-gray-100 rounded-2xl flex justify-between items-center cursor-pointer transition-all active:scale-98">
-                    <div>
-                        <h5 class="font-bold text-gray-900 text-sm">${p.name}</h5>
-                        <p class="text-[11px] text-gray-400 font-medium">Lagerbestand: ${p.stock ?? 0}</p>
+            list.innerHTML = sampleVerlauf.map(item => `
+                <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-gray-900">${item.action}</span>
+                        <span class="text-[10px] text-gray-400 font-medium">${item.time}</span>
                     </div>
-                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i>
+                    <p class="text-xs text-gray-600 font-medium">${item.details}</p>
+                    <div class="text-[10px] text-indigo-600 font-semibold pt-1">${item.user}</div>
                 </div>
             `).join('');
-
-            lucide.createIcons();
-        }
-
-        function selectVerkaufProduct(name, currentStock) {
-            selectedVerkaufProduct = { name, currentStock };
-            document.getElementById('verkauf-selected-name').innerText = name;
-            document.getElementById('verkauf-selected-stock').innerText = `Verfügbar: ${currentStock}`;
-            document.getElementById('verkauf-booking-form').classList.remove('hidden');
-        }
-
-        async function submitVerkaufBooking() {
-            const mengeInput = document.getElementById('verkauf-quantity');
-            const menge = parseInt(mengeInput.value);
-
-            if (isNaN(menge) || menge <= 0 || !selectedVerkaufProduct) {
-                alert("Bitte gib eine gültige Menge ein.");
-                return;
-            }
-
-            if (menge > selectedVerkaufProduct.currentStock) {
-                alert("Verkaufsmenge ist größer als der Lagerbestand!");
-                return;
-            }
-
-            const neuerBestand = selectedVerkaufProduct.currentStock - menge;
-            await updateStockByName(selectedVerkaufProduct.name, neuerBestand);
-            
-            mengeInput.value = '';
-            closeVerkaufModal();
-            alert(`Erfolgreich ${menge}x ${selectedVerkaufProduct.name} als verkauft verbucht.`);
         }
 
         async function updateStockByName(prodName, newStock) {
@@ -907,6 +865,7 @@
             if (error) {
                 alert("Fehler beim Löschen: " + error.message);
             } else {
+                addVerlaufEntry("Produkt gelöscht", prodName);
                 fetchProducts();
             }
         }
@@ -1024,6 +983,7 @@
 
             const neuerBestand = selectedQuickProduct.currentStock + menge;
             await updateStockByName(selectedQuickProduct.name, neuerBestand);
+            addVerlaufEntry("Wareneingang gebucht", `+${menge} Stk. ${selectedQuickProduct.name}`);
             
             mengeInput.value = '';
             closeQuickAddModal();
