@@ -145,7 +145,7 @@
         </div>
     </div>
 
-    <!-- Modal: Kisten-Schnellbuchung (Z.B. -10 oder +10 Sets auf einmal) -->
+    <!-- Modal: Kisten-Schnellbuchung -->
     <div id="box-booking-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -317,7 +317,7 @@
 
     <script>
         let allProducts = [];
-        let boxRecipes = {}; // Speichert die Rezepturen (z.B. { "Flexblende": { "Drahtseil": 5, "Schrauben": 10 } })
+        let boxRecipes = {}; 
         
         let sampleAuftraege = [
             { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", targetQuantity: 50, producedQuantity: 10, image: "", erledigt: false }
@@ -532,149 +532,105 @@
             }
         }
 
-        function closeProductModal() { document.getElementById('add-product-modal').classList.add('hidden'); }
+        function closeProductModal() { 
+            document.getElementById('add-product-modal').classList.add('hidden'); 
+        }
+
         function closeAuftragModal() { 
             document.getElementById('add-auftrag-modal').classList.add('hidden'); 
             selectedAuftragImageBase64 = "";
             document.getElementById('auftrag-image-preview-container').classList.add('hidden');
         }
+
         function closeReklaModal() { 
             document.getElementById('add-rekla-modal').classList.add('hidden'); 
             selectedReklaImageBase64 = "";
             document.getElementById('rekla-image-preview-container').classList.add('hidden');
         }
 
-        async function saveNewProduct(e) {
-            e.preventDefault();
-            const name = document.getElementById('new-prod-name').value;
-            const category = document.getElementById('new-prod-box').value;
-            const stock = parseInt(document.getElementById('new-prod-stock').value) || 0;
-            const min_stock = parseInt(document.getElementById('new-prod-min').value) || 5;
-            const barcode = document.getElementById('new-prod-barcode').value;
-
-            const { error } = await db.from('products').insert([{ name, category, stock, min_stock, barcode }]);
-            if (error) alert("Fehler: " + error.message);
-            else {
-                addVerlaufEntry("Neues Produkt erstellt", `"${name}" (${stock} Stk.) in Kiste "${category}"`);
-                closeProductModal();
-                fetchProducts();
-            }
-        }
-
-        function saveNewAuftrag(e) {
-            e.preventDefault();
-            const title = document.getElementById('auftrag-title').value;
-            const produkt = document.getElementById('auftrag-produkt').value;
-            const targetQuantity = parseInt(document.getElementById('auftrag-target').value) || 1;
-
-            sampleAuftraege.unshift({
-                id: Date.now(),
-                name: title,
-                produkt: produkt,
-                targetQuantity: targetQuantity,
-                producedQuantity: 0,
-                image: selectedAuftragImageBase64,
-                erledigt: false
-            });
-
-            addVerlaufEntry("Auftrag angelegt", `"${title}" - Ziel: ${targetQuantity}x ${produkt}`);
-            closeAuftragModal();
-            openAuftragsPortal();
-        }
-
-        function saveNewRekla(e) {
-            e.preventDefault();
-            const title = document.getElementById('rekla-title').value;
-            const produkt = document.getElementById('rekla-produkt').value;
-            const grund = document.getElementById('rekla-grund').value;
-
-            sampleReklamationen.unshift({
-                id: Date.now(),
-                name: title,
-                produkt: produkt,
-                grund: grund,
-                image: selectedReklaImageBase64,
-                status: "Neu"
-            });
-
-            addVerlaufEntry("Reklamation gemeldet", `"${title}" für ${produkt}`);
-            closeReklaModal();
-            openReklamationsPortal();
-        }
-
-        function isProductLow(p) {
-            const min = p.min_stock ?? 5;
-            return (p.stock ?? 0) <= min;
-        }
-
-        // --- LAGER TAB & KISTEN-STÜCKLISTEN ---
+        // --- PRODUKTE / LAGER LOGIK ---
         async function fetchProducts() {
+            const content = document.getElementById('content-list');
+            content.innerHTML = '<div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Daten...</div>';
+
             const { data, error } = await db.from('products').select('*');
-            if (error) console.error(error);
+            if (error) {
+                content.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-semibold">Fehler beim Laden: ${error.message}</div>`;
+                return;
+            }
+
             allProducts = data || [];
-            
-            checkLowStockGlobal();
+            checkLowStock();
 
             if (activeBox) {
-                renderProductsInBox(activeBox);
+                renderBoxProducts(activeBox);
             } else {
                 renderBoxes();
             }
         }
 
-        function checkLowStockGlobal() {
-            const lowItems = allProducts.filter(p => isProductLow(p));
+        function checkLowStock() {
+            const lowProducts = allProducts.filter(p => p.stock <= (p.min_stock || 5));
             const banner = document.getElementById('low-stock-banner');
-            if (lowItems.length > 0 && currentTab === 'lager') {
+            if (lowProducts.length > 0) {
                 banner.classList.remove('hidden');
-                document.getElementById('low-stock-text').innerText = 
-                    `${lowItems.length} Artikel haben ihren Mindestbestand erreicht!`;
+                document.getElementById('low-stock-text').innerText = `Achtung: ${lowProducts.length} Produkt(e) haben einen kritischen Bestand!`;
             } else {
                 banner.classList.add('hidden');
             }
         }
 
         function renderBoxes() {
-            activeBox = null;
-            document.getElementById('header-title').innerText = "Lager / Kisten";
+            document.getElementById('header-title').innerText = "Lager-Kisten";
             document.getElementById('back-btn').classList.add('hidden');
-            
-            const list = document.getElementById('content-list');
-            const boxes = [...new Set(allProducts.map(p => p.category || 'Allgemein'))];
+            const content = document.getElementById('content-list');
 
-            if (boxes.length === 0) {
-                list.innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Noch keine Kisten vorhanden.<br>Tippe auf "+", um eine anzulegen.</div>`;
+            const boxes = {};
+            allProducts.forEach(p => {
+                const boxName = p.box || 'Unsortiert';
+                if (!boxes[boxName]) boxes[boxName] = [];
+                boxes[boxName].push(p);
+            });
+
+            const keys = Object.keys(boxes);
+            if (keys.length === 0) {
+                content.innerHTML = '<div class="text-center text-gray-400 py-16 text-sm font-medium">Keine Kisten vorhanden. Klicke oben rechts auf +, um Produkte hinzuzufügen.</div>';
                 return;
             }
 
-            list.innerHTML = boxes.map(boxName => {
-                const boxProds = allProducts.filter(p => (p.category || 'Allgemein') === boxName);
-                const count = boxProds.length;
-                const hasLowStock = boxProds.some(p => isProductLow(p));
+            let html = '<div class="grid grid-cols-2 gap-3">';
+            keys.forEach(b => {
+                const count = boxes[b].length;
+                const hasWarning = boxes[b].some(p => p.stock <= (p.min_stock || 5));
+                const recipeConfigured = boxRecipes[b] && Object.keys(boxRecipes[b]).length > 0;
 
-                return `
-                    <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex items-center justify-between">
-                        <div onclick="openBox('${boxName}')" class="flex items-center space-x-3.5 flex-1 cursor-pointer">
-                            <div class="w-12 h-12 rounded-2xl ${hasLowStock ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'} flex items-center justify-center shrink-0">
-                                <i data-lucide="archive" class="w-6 h-6"></i>
+                html += `
+                    <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-200/60 flex flex-col justify-between space-y-3 hover:shadow-md transition-all relative">
+                        <div onclick="openBox('${b}')" class="cursor-pointer">
+                            <div class="w-10 h-10 rounded-2xl ${hasWarning ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-blue-600'} flex items-center justify-center mb-2">
+                                <i data-lucide="package" class="w-5 h-5"></i>
                             </div>
-                            <div>
-                                <h4 class="font-bold text-gray-900 text-base">${boxName}</h4>
-                                <p class="text-xs text-gray-400 font-medium">${count} Produkt(e)</p>
-                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm truncate">${b}</h3>
+                            <p class="text-[11px] font-medium text-gray-400 mt-0.5">${count} Artikel</p>
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <button onclick="openBoxBookingModal('${boxName}')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-xl text-xs active:scale-95 transition-all">
-                                Set buchen
+                        <div class="pt-2 border-t border-gray-100 flex items-center justify-between space-x-1">
+                            <button onclick="openBoxConfigModal('${b}')" class="p-2 rounded-xl text-xs font-semibold ${recipeConfigured ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-500'} hover:bg-indigo-100 transition-all flex items-center space-x-1">
+                                <i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
+                                <span>Rezept</span>
                             </button>
-                            <button onclick="openBoxConfigModal('${boxName}')" class="w-9 h-9 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center active:scale-90 transition-all">
-                                <i data-lucide="more-vertical" class="w-4 h-4"></i>
-                            </button>
+                            ${recipeConfigured ? `
+                                <button onclick="openBoxBookingModal('${b}')" class="p-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm hover:bg-blue-700 transition-all flex items-center space-x-1">
+                                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                                    <span>Buchen</span>
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
                 `;
-            }).join('');
+            });
+            html += '</div>';
 
+            content.innerHTML = html;
             lucide.createIcons();
         }
 
@@ -682,111 +638,98 @@
             activeBox = boxName;
             document.getElementById('header-title').innerText = boxName;
             document.getElementById('back-btn').classList.remove('hidden');
-            renderProductsInBox(boxName);
+            renderBoxProducts(boxName);
         }
 
-        function renderProductsInBox(boxName) {
-            const list = document.getElementById('content-list');
-            const boxProducts = allProducts.filter(p => (p.category || 'Allgemein') === boxName);
+        function renderBoxProducts(boxName) {
+            const content = document.getElementById('content-list');
+            const products = allProducts.filter(p => (p.box || 'Unsortiert') === boxName);
 
-            let html = `
-                <div class="bg-blue-50/60 p-4 rounded-3xl border border-blue-100 space-y-3 mb-2">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h4 class="font-bold text-blue-900 text-sm">Ganzes Set buchen: "${boxName}"</h4>
-                            <p class="text-[11px] text-blue-600">Bucht alle Einzelprodukte dieser Kiste gebündelt ab/zu</p>
-                        </div>
-                        <button onclick="openBoxConfigModal('${boxName}')" class="p-2 bg-white rounded-xl text-blue-600 shadow-sm hover:bg-blue-50 active:scale-90 transition-all">
-                            <i data-lucide="settings" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="openBoxBookingModal('${boxName}')" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 transition-all">
-                            Set Mengen-Buchung (+ / -)
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            if (boxProducts.length === 0) {
-                html += `<div class="text-center text-gray-400 py-16 text-sm font-medium">Diese Kiste ist leer.</div>`;
-            } else {
-                html += boxProducts.map(p => {
-                    const isLow = isProductLow(p);
-                    const min = p.min_stock ?? 5;
-
-                    return `
-                        <div class="bg-white p-4 rounded-3xl shadow-sm border ${isLow ? 'border-amber-300 bg-amber-50/20' : 'border-gray-100'} flex flex-col space-y-3">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="flex items-center space-x-2">
-                                        <h4 class="font-bold text-gray-900 text-sm">${p.name}</h4>
-                                        ${isLow ? '<span class="text-[10px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Gering</span>' : ''}
-                                    </div>
-                                    <p class="text-xs text-gray-400 font-medium mt-0.5">
-                                        Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span>
-                                        <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
-                                    </p>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
-                                        <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
-                                        <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
-                                    </div>
-                                    <button onclick="deleteProduct('${p.id}', '${p.name}')" class="w-9 h-9 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all flex items-center justify-center ml-1">
-                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="pt-2 border-t border-gray-100 flex space-x-2">
-                                <button onclick="openReklamationsPortal('${p.name}')" class="flex-1 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 transition-all">
-                                    <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
-                                    <span>Reklamation</span>
-                                </button>
-                                <button onclick="openAuftragsPortal('${p.name}')" class="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 transition-all">
-                                    <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
-                                    <span>Auftrag</span>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+            if (products.length === 0) {
+                content.innerHTML = '<div class="text-center text-gray-400 py-16 text-sm font-medium">Keine Produkte in dieser Kiste.</div>';
+                return;
             }
 
-            list.innerHTML = html;
+            let html = '<div class="space-y-2.5">';
+            products.forEach(p => {
+                const isLow = p.stock <= (p.min_stock || 5);
+                html += `
+                    <div class="bg-white p-4 rounded-2xl border border-gray-200/60 shadow-sm flex items-center justify-between">
+                        <div>
+                            <h4 class="font-bold text-sm text-gray-900">${p.name}</h4>
+                            <p class="text-[11px] text-gray-400 font-medium">Mindestbestand: ${p.min_stock || 5} | Barcode: ${p.barcode || 'Keiner'}</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="px-3 py-1 rounded-full text-xs font-extrabold ${isLow ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}">
+                                ${p.stock} Stk.
+                            </span>
+                            <button onclick="quickUpdateStock(${p.id}, -1)" class="w-7 h-7 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center font-bold active:scale-90">-</button>
+                            <button onclick="quickUpdateStock(${p.id}, 1)" class="w-7 h-7 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center font-bold active:scale-90">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            content.innerHTML = html;
             lucide.createIcons();
         }
 
-        // --- KISTEN-STÜCKLISTE MODALS ---
+        async function quickUpdateStock(id, change) {
+            const prod = allProducts.find(p => p.id === id);
+            if (!prod) return;
+
+            const newStock = Math.max(0, prod.stock + change);
+            const { error } = await db.from('products').update({ stock: newStock }).eq('id', id);
+
+            if (!error) {
+                addVerlaufEntry('Bestandsänderung', `${prod.name}: ${prod.stock} → ${newStock}`);
+                prod.stock = newStock;
+                checkLowStock();
+                if (activeBox) renderBoxProducts(activeBox);
+                else renderBoxes();
+            }
+        }
+
+        async function saveNewProduct(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-prod-name').value.trim();
+            const box = document.getElementById('new-prod-box').value.trim();
+            const stock = parseInt(document.getElementById('new-prod-stock').value) || 0;
+            const min_stock = parseInt(document.getElementById('new-prod-min').value) || 5;
+            const barcode = document.getElementById('new-prod-barcode').value.trim();
+
+            const { data, error } = await db.from('products').insert([{ name, box, stock, min_stock, barcode }]).select();
+
+            if (error) {
+                alert("Fehler beim Speichern: " + error.message);
+            } else {
+                addVerlaufEntry('Neues Produkt', `${name} in Kiste "${box}" erstellt (Bestand: ${stock})`);
+                closeProductModal();
+                fetchProducts();
+            }
+        }
+
+        // --- KISTEN SET-REZEPTUR & BUCHUNG ---
         function openBoxConfigModal(boxName) {
             configBoxName = boxName;
             document.getElementById('config-box-title').innerText = `Set: ${boxName}`;
-            
             const list = document.getElementById('config-products-list');
-            const boxProds = allProducts.filter(p => (p.category || 'Allgemein') === boxName);
 
-            if (boxProds.length === 0) {
-                list.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">Keine Produkte in dieser Kiste.</div>`;
-            } else {
-                const recipe = boxRecipes[boxName] || {};
-                list.innerHTML = boxProds.map(p => {
-                    const currentQty = recipe[p.name] !== undefined ? recipe[p.name] : 1; // Standard: 1 Stk. pro Set
-                    return `
-                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                            <div>
-                                <h5 class="font-bold text-xs text-gray-900">${p.name}</h5>
-                                <p class="text-[10px] text-gray-400">Aktueller Lagerbestand: ${p.stock ?? 0}</p>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <input type="number" id="recipe-qty-${p.name}" value="${currentQty}" min="0" class="w-16 px-2 py-1.5 rounded-xl border border-gray-200 text-center font-bold text-xs bg-white">
-                                <span class="text-xs font-semibold text-gray-500">Stk.</span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
+            const currentRecipe = boxRecipes[boxName] || {};
+            let html = '';
 
+            allProducts.forEach(p => {
+                const qty = currentRecipe[p.name] || 0;
+                html += `
+                    <div class="flex items-center justify-between p-2 rounded-xl bg-gray-50 border border-gray-100">
+                        <span class="text-xs font-semibold text-gray-700 truncate max-w-[180px]">${p.name}</span>
+                        <input type="number" data-prod-name="${p.name}" value="${qty}" min="0" placeholder="0" class="recipe-input w-16 px-2 py-1 rounded-lg border border-gray-200 text-xs text-center font-bold">
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
             document.getElementById('box-config-modal').classList.remove('hidden');
         }
 
@@ -796,26 +739,26 @@
 
         function saveBoxRecipe() {
             if (!configBoxName) return;
-            const boxProds = allProducts.filter(p => (p.category || 'Allgemein') === configBoxName);
-            
-            if (!boxRecipes[configBoxName]) boxRecipes[configBoxName] = {};
 
-            boxProds.forEach(p => {
-                const input = document.getElementById(`recipe-qty-${p.name}`);
-                if (input) {
-                    boxRecipes[configBoxName][p.name] = parseInt(input.value) || 0;
-                }
+            const recipe = {};
+            const inputs = document.querySelectorAll('.recipe-input');
+
+            inputs.forEach(inp => {
+                const val = parseInt(inp.value) || 0;
+                const name = inp.getAttribute('data-prod-name');
+                if (val > 0 && name) recipe[name] = val;
             });
 
+            boxRecipes[configBoxName] = recipe;
             saveRecipesToStorage();
-            addVerlaufEntry("Set-Stückliste geändert", `Rezeptur für Kiste "${configBoxName}" angepasst`);
+            addVerlaufEntry('Rezeptur gespeichert', `Kiste "${configBoxName}" Set-Stückliste aktualisiert`);
             closeBoxConfigModal();
-            alert(`Stückliste für "${configBoxName}" wurde erfolgreich gespeichert!`);
+            renderBoxes();
         }
 
         function openBoxBookingModal(boxName) {
             bookingBoxName = boxName;
-            document.getElementById('box-booking-title').innerText = `Set Buchen: ${boxName}`;
+            document.getElementById('box-booking-title').innerText = `${boxName} buchen`;
             document.getElementById('box-booking-amount').value = '';
             document.getElementById('box-booking-modal').classList.remove('hidden');
         }
@@ -824,341 +767,45 @@
             document.getElementById('box-booking-modal').classList.add('hidden');
         }
 
+        async function submitBoxBooking(multiplier) {
+            if (!bookingBoxName) return;
+            const recipe = boxRecipes[bookingBoxName];
+            if (!recipe || Object.keys(recipe).length === 0) {
+                alert("Keine Rezeptur vorhanden!");
+                return;
+            }
+
+            for (const [prodName, qty] of Object.entries(recipe)) {
+                const prod = allProducts.find(p => p.name === prodName);
+                if (prod) {
+                    const change = qty * multiplier;
+                    const newStock = Math.max(0, prod.stock + change);
+                    await db.from('products').update({ stock: newStock }).eq('id', prod.id);
+                    prod.stock = newStock;
+                }
+            }
+
+            addVerlaufEntry('Set-Buchung', `${multiplier > 0 ? '+' : ''}${multiplier} Set(s) für Kiste "${bookingBoxName}" gebucht`);
+            closeBoxBookingModal();
+            fetchProducts();
+        }
+
         function submitBoxBookingCustom() {
             const val = parseInt(document.getElementById('box-booking-amount').value);
-            if (isNaN(val) || val === 0) {
-                alert("Bitte gib eine gültige Anzahl ein (z. B. -10 oder 10).");
+            if (!val || val === 0) {
+                alert("Bitte eine verlassliche Zahl eingeben!");
                 return;
             }
             submitBoxBooking(val);
         }
 
-        async function submitBoxBooking(setMultiplier) {
-            if (!bookingBoxName) return;
-
-            const boxProds = allProducts.filter(p => (p.category || 'Allgemein') === bookingBoxName);
-            const recipe = boxRecipes[bookingBoxName] || {};
-
-            if (boxProds.length === 0) {
-                alert("In dieser Kiste befinden sich keine Produkte.");
-                return;
-            }
-
-            let summaryDetails = [];
-
-            for (const p of boxProds) {
-                const qtyPerSet = recipe[p.name] !== undefined ? recipe[p.name] : 1;
-                const totalChange = qtyPerSet * setMultiplier;
-                const newStock = Math.max(0, (p.stock ?? 0) + totalChange);
-
-                await db.from('products').update({ stock: newStock }).eq('name', p.name);
-                summaryDetails.push(`${p.name}: ${p.stock ?? 0} -> ${newStock}`);
-            }
-
-            const actionName = setMultiplier < 0 ? "Set-Warenausgang" : "Set-Wareneingang";
-            addVerlaufEntry(actionName, `${setMultiplier > 0 ? '+' : ''}${setMultiplier}x Set "${bookingBoxName}" gebucht (${summaryDetails.join(', ')})`);
-
-            closeBoxBookingModal();
-            fetchProducts();
-        }
-
-        // --- AUFTRAGS-PORTAL ---
-        function openAuftragsPortal(filterProduktName = null) {
-            document.getElementById('header-title').innerText = "Auftrags-Portal";
-            document.getElementById('back-btn').classList.remove('hidden');
-            
-            const list = document.getElementById('content-list');
-            const gefilterteAuftraege = filterProduktName 
-                ? sampleAuftraege.filter(a => a.produkt === filterProduktName)
-                : sampleAuftraege;
-
-            let html = `
-                <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-gray-900">Aufträge & Produktion</h3>
-                        ${filterProduktName ? `<span class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded-lg">${filterProduktName}</span>` : ''}
-                    </div>
-                    
-                    <div class="space-y-3">
-            `;
-
-            if (gefilterteAuftraege.length === 0) {
-                html += `<div class="py-4 text-center text-gray-400 text-xs">Keine Aufträge vorhanden.</div>`;
-            } else {
-                gefilterteAuftraege.forEach(auftrag => {
-                    const isDone = auftrag.producedQuantity >= auftrag.targetQuantity || auftrag.erledigt;
-                    
-                    html += `
-                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex flex-col space-y-3">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h5 class="font-bold text-gray-800 text-sm ${isDone ? 'line-through-text' : ''}">${auftrag.name}</h5>
-                                    <p class="text-xs text-gray-500 font-medium">${auftrag.produkt}</p>
-                                </div>
-                                <button onclick="deleteAuftrag(${auftrag.id})" class="text-red-500 hover:text-red-700 p-1">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-
-                            <div class="bg-white p-2.5 rounded-xl border border-gray-200/80 flex justify-between items-center">
-                                <div>
-                                    <span class="text-[11px] font-semibold text-gray-400 block">Produktionsfortschritt</span>
-                                    <span class="text-xs font-bold ${isDone ? 'text-emerald-600' : 'text-gray-800'}">
-                                        ${auftrag.producedQuantity} / ${auftrag.targetQuantity} Stk. ${isDone ? '✓ Fertig' : ''}
-                                    </span>
-                                </div>
-                                <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-xl">
-                                    <button onclick="updateAuftragQuantity(${auftrag.id}, -1)" class="w-7 h-7 rounded-lg bg-white text-gray-700 font-bold text-sm shadow-sm active:scale-90 transition-all">-</button>
-                                    <button onclick="updateAuftragQuantity(${auftrag.id}, 1)" class="w-7 h-7 rounded-lg bg-indigo-600 text-white font-bold text-sm shadow-sm active:scale-90 transition-all">+</button>
-                                </div>
-                            </div>
-
-                            ${auftrag.image ? `<img src="${auftrag.image}" class="w-full h-32 rounded-xl object-cover border border-gray-200">` : ''}
-                        </div>
-                    `;
-                });
-            }
-
-            html += `
-                    </div>
-                </div>
-            `;
-
-            list.innerHTML = html;
-            lucide.createIcons();
-        }
-
-        function updateAuftragQuantity(id, delta) {
-            sampleAuftraege = sampleAuftraege.map(a => {
-                if (a.id === id) {
-                    const newQty = Math.max(0, a.producedQuantity + delta);
-                    addVerlaufEntry("Produktion angepasst", `${a.name}: ${a.producedQuantity} -> ${newQty} Stk.`);
-                    return {
-                        ...a,
-                        producedQuantity: newQty,
-                        erledigt: newQty >= a.targetQuantity
-                    };
-                }
-                return a;
-            });
-            openAuftragsPortal();
-        }
-
-        function deleteAuftrag(id) {
-            if(!confirm("Auftrag wirklich löschen?")) return;
-            const target = sampleAuftraege.find(a => a.id === id);
-            if(target) addVerlaufEntry("Auftrag gelöscht", target.name);
-            sampleAuftraege = sampleAuftraege.filter(a => a.id !== id);
-            openAuftragsPortal();
-        }
-
-        // --- REKLAMATIONS-PORTAL ---
-        function openReklamationsPortal(filterProduktName = null) {
-            document.getElementById('header-title').innerText = "Reklamations-Portal";
-            document.getElementById('back-btn').classList.remove('hidden');
-
-            const list = document.getElementById('content-list');
-            const gefilterteReklas = filterProduktName 
-                ? sampleReklamationen.filter(r => r.produkt === filterProduktName)
-                : sampleReklamationen;
-
-            let html = `
-                <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-gray-900">Reklamationen</h3>
-                        ${filterProduktName ? `<span class="text-xs text-amber-600 font-semibold bg-amber-50 px-2 py-1 rounded-lg">${filterProduktName}</span>` : ''}
-                    </div>
-                    
-                    <div class="space-y-3">
-            `;
-
-            if (gefilterteReklas.length === 0) {
-                html += `<div class="text-center text-gray-400 py-4 text-xs">Keine Reklamationen vorhanden.</div>`;
-            } else {
-                gefilterteReklas.forEach(rekla => {
-                    html += `
-                        <div class="p-3 bg-amber-50/40 border border-amber-100 rounded-2xl space-y-2">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h5 class="font-bold text-gray-800 text-xs">${rekla.name}</h5>
-                                    <p class="text-[11px] font-semibold text-amber-800">${rekla.produkt}</p>
-                                </div>
-                                <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded-lg">${rekla.status}</span>
-                            </div>
-                            <p class="text-xs text-gray-600">${rekla.grund}</p>
-                            ${rekla.image ? `<img src="${rekla.image}" class="w-full h-32 rounded-xl object-cover border border-amber-200 mt-2">` : ''}
-                        </div>
-                    `;
-                });
-            }
-
-            html += `
-                    </div>
-                </div>
-            `;
-
-            list.innerHTML = html;
-            lucide.createIcons();
-        }
-
-        // --- TEAM TAB ---
-        async function renderTeamScreen() {
-            const list = document.getElementById('content-list');
-            const { data: profiles } = await db.from('profiles').select('*');
-
-            let html = `
-                <div class="space-y-4">
-                    <button onclick="openVerlaufModal()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-3xl shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 active:scale-98 transition-all">
-                        <i data-lucide="history" class="w-5 h-5"></i>
-                        <span>Verlaufs-Portal öffnen</span>
-                    </button>
-
-                    <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-3">
-                        <h3 class="font-bold text-gray-900 text-sm border-b border-gray-100 pb-2">Registriertes Team</h3>
-            `;
-
-            if (!profiles || profiles.length === 0) {
-                html += `<div class="p-3 text-xs text-gray-400 text-center">Keine Mitarbeiter gefunden.</div>`;
-            } else {
-                profiles.forEach(p => {
-                    const isMe = p.email === currentUser?.email;
-                    html += `
-                        <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                                    ${p.email ? p.email.substring(0, 2).toUpperCase() : 'MA'}
-                                </div>
-                                <div>
-                                    <h5 class="font-bold text-gray-800 text-xs">${p.email}</h5>
-                                    <span class="text-[10px] text-gray-400 font-medium">${isMe ? 'Aktuell angemeldet' : 'Mitarbeiter'}</span>
-                                </div>
-                            </div>
-                            ${isMe ? '<span class="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>' : ''}
-                        </div>
-                    `;
-                });
-            }
-
-            html += `
-                    </div>
-                </div>
-            `;
-
-            list.innerHTML = html;
-            lucide.createIcons();
-        }
-
-        // --- VERLAUFS-PORTAL MODAL LOGIK ---
-        async function openVerlaufModal() {
-            await fetchVerlauf();
-            renderVerlaufList();
-            document.getElementById('verlauf-modal').classList.remove('hidden');
-        }
-
-        function closeVerlaufModal() {
-            document.getElementById('verlauf-modal').classList.add('hidden');
-        }
-
-        function renderVerlaufList() {
-            const list = document.getElementById('verlauf-list');
-
-            if (globalVerlauf.length === 0) {
-                list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Noch keine Aktivitäten vorhanden.</div>`;
-                return;
-            }
-
-            list.innerHTML = globalVerlauf.map(item => `
-                <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl space-y-1">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-gray-900">${item.action}</span>
-                        <span class="text-[10px] text-gray-400 font-medium">${item.timestamp || ''}</span>
-                    </div>
-                    <p class="text-xs text-gray-600 font-medium">${item.details}</p>
-                    <div class="text-[10px] text-blue-600 font-bold pt-1 flex items-center space-x-1">
-                        <i data-lucide="user" class="w-3 h-3 inline"></i>
-                        <span>${item.user_email || item.user || 'Unbekannt'}</span>
-                    </div>
-                </div>
-            `).join('');
-
-            lucide.createIcons();
-        }
-
-        async function updateStockByName(prodName, newStock) {
-            if (newStock < 0) newStock = 0;
-            
-            const prod = allProducts.find(p => p.name === prodName);
-            const oldStock = prod ? prod.stock : '?';
-
-            const { error } = await db.from('products').update({ stock: newStock }).eq('name', prodName);
-            if (!error) {
-                addVerlaufEntry("Bestand geändert", `"${prodName}": ${oldStock} -> ${newStock} Stk.`);
-                fetchProducts();
-            }
-        }
-
-        async function deleteProduct(id, prodName) {
-            if (!confirm(`Möchtest du "${prodName}" wirklich löschen?`)) return;
-
-            const { error } = await db.from('products').delete().eq('id', id);
-            if (error) {
-                alert("Fehler beim Löschen: " + error.message);
-            } else {
-                addVerlaufEntry("Produkt gelöscht", prodName);
-                fetchProducts();
-            }
-        }
-
-        // --- BARCODE SCANNER LOGIK ---
-        function startScanner() {
-            document.getElementById('scanner-container').classList.remove('hidden');
-            document.getElementById('start-scan-btn').classList.add('hidden');
-
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 150 } },
-                (decodedText) => {
-                    stopScanner();
-                    handleScannedCode(decodedText);
-                },
-                (errorMessage) => {}
-            ).catch(err => {
-                alert("Kamera-Zugriff nicht möglich: " + err);
-                stopScanner();
-            });
-        }
-
-        function stopScanner() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then(() => {
-                    html5QrcodeScanner.clear();
-                    html5QrcodeScanner = null;
-                }).catch(() => {});
-            }
-            document.getElementById('scanner-container').classList.add('hidden');
-            document.getElementById('start-scan-btn').classList.remove('hidden');
-        }
-
-        function handleScannedCode(barcodeText) {
-            const foundProduct = allProducts.find(p => p.barcode === barcodeText || p.name.toLowerCase() === barcodeText.toLowerCase());
-
-            if (foundProduct) {
-                selectQuickProduct(foundProduct.name, foundProduct.stock ?? 0);
-            } else {
-                alert(`Barcode "${barcodeText}" wurde keinem Produkt zugeordnet.`);
-                document.getElementById('quick-search').value = barcodeText;
-                filterQuickAddList();
-            }
-        }
-
+        // --- SCHNELLBUCHUNG & SCANNER ---
         function openQuickAddModal() {
-            selectedQuickProduct = null;
-            document.getElementById('quick-booking-form').classList.add('hidden');
-            document.getElementById('quick-search').value = '';
-            document.getElementById('quick-quantity').value = '';
-            filterQuickAddList();
             document.getElementById('quick-add-modal').classList.remove('hidden');
+            document.getElementById('quick-search').value = '';
+            document.getElementById('quick-booking-form').classList.add('hidden');
+            selectedQuickProduct = null;
+            filterQuickAddList();
         }
 
         function closeQuickAddModal() {
@@ -1167,87 +814,319 @@
         }
 
         function filterQuickAddList() {
-            const query = document.getElementById('quick-search').value.toLowerCase();
+            const query = document.getElementById('quick-search').value.toLowerCase().trim();
             const list = document.getElementById('quick-product-list');
 
-            const uniqueMap = new Map();
-            allProducts.forEach(p => {
-                if (!uniqueMap.has(p.name.toLowerCase())) {
-                    uniqueMap.set(p.name.toLowerCase(), p);
-                }
-            });
-            const uniqueProducts = Array.from(uniqueMap.values());
-
-            const filtered = uniqueProducts.filter(p => 
-                p.name.toLowerCase().includes(query) || 
-                (p.barcode && p.barcode.toLowerCase().includes(query))
+            const filtered = allProducts.filter(p => 
+                p.name.toLowerCase().includes(query) || (p.barcode && p.barcode.toLowerCase().includes(query))
             );
 
-            if (filtered.length === 0) {
-                list.innerHTML = `<div class="text-center text-gray-400 py-6 text-xs font-medium">Keine Produkte gefunden.</div>`;
-                return;
-            }
-
-            list.innerHTML = filtered.map(p => `
-                <div onclick="selectQuickProduct('${p.name}', ${p.stock ?? 0})" class="p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-2xl flex justify-between items-center cursor-pointer transition-all active:scale-98">
-                    <div>
-                        <h5 class="font-bold text-gray-900 text-sm">${p.name}</h5>
-                        <p class="text-[11px] text-gray-400 font-medium">Kiste: ${p.category || 'Allgemein'}</p>
+            let html = '';
+            filtered.forEach(p => {
+                html += `
+                    <div onclick="selectQuickProduct(${p.id})" class="p-3 bg-gray-50 hover:bg-blue-50 rounded-xl border border-gray-100 flex justify-between items-center cursor-pointer transition-all">
+                        <div>
+                            <div class="font-bold text-xs text-gray-900">${p.name}</div>
+                            <div class="text-[10px] text-gray-400">${p.box || 'Unsortiert'}</div>
+                        </div>
+                        <span class="text-xs font-extrabold text-blue-600">${p.stock} Stk.</span>
                     </div>
-                    <div class="text-right">
-                        <span class="text-xs font-bold text-gray-600 bg-white px-2.5 py-1 rounded-xl border border-gray-200">
-                            Aktuell: ${p.stock ?? 0}
-                        </span>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            });
 
-            lucide.createIcons();
+            list.innerHTML = html || '<div class="text-center text-xs text-gray-400 py-4">Kein Produkt gefunden</div>';
         }
 
-        function selectQuickProduct(name, currentStock) {
-            selectedQuickProduct = { name, currentStock };
-            document.getElementById('selected-product-name').innerText = name;
-            document.getElementById('selected-product-stock').innerText = `Aktueller Bestand: ${currentStock}`;
+        function selectQuickProduct(id) {
+            selectedQuickProduct = allProducts.find(p => p.id === id);
+            if (!selectedQuickProduct) return;
+
+            document.getElementById('selected-product-name').innerText = selectedQuickProduct.name;
+            document.getElementById('selected-product-stock').innerText = `Bestand: ${selectedQuickProduct.stock} Stk.`;
             document.getElementById('quick-booking-form').classList.remove('hidden');
             document.getElementById('quick-quantity').value = '';
-            updateBookingLabel('');
         }
 
         function updateBookingLabel(val) {
+            const num = parseInt(val) || 0;
             const label = document.getElementById('booking-type-label');
-            const num = parseInt(val);
-            
-            if (!isNaN(num) && num < 0) {
-                label.innerHTML = `<span class="text-red-600 font-bold">Warenausgang (Abbuchen):</span> ${Math.abs(num)} Stk. werden abgezogen`;
-            } else if (!isNaN(num) && num > 0) {
-                label.innerHTML = `<span class="text-emerald-600 font-bold">Wareneingang (Zubuchen):</span> +${num} Stk. werden hinzugefügt`;
-            } else {
-                label.innerText = "Menge eintragen (z. B. 100 für Eingang oder -100 für Ausgang)";
-            }
+            if (num > 0) label.innerText = `Zugang: +${num} Stück zubuchen`;
+            else if (num < 0) label.innerText = `Abgang: ${num} Stück abbuchen`;
+            else label.innerText = "Menge eintragen (z. B. 100 für Eingang oder -100 für Ausgang)";
         }
 
         async function submitQuickBooking() {
-            const mengeInput = document.getElementById('quick-quantity');
-            const menge = parseInt(mengeInput.value);
+            if (!selectedQuickProduct) return;
+            const change = parseInt(document.getElementById('quick-quantity').value);
+            if (isNaN(change) || change === 0) return;
 
-            if (isNaN(menge) || menge === 0 || !selectedQuickProduct) {
-                alert("Bitte gib eine gültige Zahl ungleich 0 ein (z. B. 50 oder -50).");
+            const newStock = Math.max(0, selectedQuickProduct.stock + change);
+            const { error } = await db.from('products').update({ stock: newStock }).eq('id', selectedQuickProduct.id);
+
+            if (!error) {
+                addVerlaufEntry('Schnellbuchung', `${selectedQuickProduct.name}: ${change > 0 ? '+' : ''}${change} Stück (Neu: ${newStock})`);
+                selectedQuickProduct.stock = newStock;
+                closeQuickAddModal();
+                fetchProducts();
+            }
+        }
+
+        function startScanner() {
+            document.getElementById('scanner-container').classList.remove('hidden');
+            document.getElementById('start-scan-btn').classList.add('hidden');
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 200, height: 200 } },
+                (decodedText) => {
+                    stopScanner();
+                    document.getElementById('quick-search').value = decodedText;
+                    filterQuickAddList();
+                },
+                () => {}
+            );
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    document.getElementById('scanner-container').classList.add('hidden');
+                    document.getElementById('start-scan-btn').classList.remove('hidden');
+                }).catch(() => {});
+            }
+        }
+
+        // --- AUFTRÄGE PORTAL ---
+        function openAuftragsPortal() {
+            document.getElementById('header-title').innerText = "Aufträge";
+            renderAuftraege();
+        }
+
+        function renderAuftraege() {
+            const content = document.getElementById('content-list');
+            if (sampleAuftraege.length === 0) {
+                content.innerHTML = '<div class="text-center text-gray-400 py-16 text-sm font-medium">Keine Aufträge vorhanden.</div>';
                 return;
             }
 
-            const neuerBestand = selectedQuickProduct.currentStock + menge;
-            const berechneterBestand = neuerBestand < 0 ? 0 : neuerBestand;
+            let html = '<div class="space-y-3">';
+            sampleAuftraege.forEach(a => {
+                const percent = Math.min(100, Math.round((a.producedQuantity / a.targetQuantity) * 100));
+                html += `
+                    <div class="bg-white p-4 rounded-3xl border border-gray-200/60 shadow-sm space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-sm text-gray-900 ${a.erledigt ? 'line-through-text' : ''}">${a.name}</h3>
+                                <p class="text-xs text-gray-500 font-medium mt-0.5">${a.produkt}</p>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${a.erledigt ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}">
+                                ${a.erledigt ? 'Erledigt' : 'Aktiv'}
+                            </span>
+                        </div>
 
-            await updateStockByName(selectedQuickProduct.name, berechneterBestand);
+                        ${a.image ? `<img src="${a.image}" class="w-full h-32 object-cover rounded-2xl border border-gray-100">` : ''}
 
-            const aktionsText = menge > 0 ? "Wareneingang gebucht" : "Warenausgang gebucht";
-            const vorzeichenText = menge > 0 ? `+${menge}` : `${menge}`;
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-gray-500">Fortschritt</span>
+                                <span class="text-gray-900">${a.producedQuantity} / ${a.targetQuantity} Stk. (${percent}%)</span>
+                            </div>
+                            <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-600 rounded-full" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
 
-            addVerlaufEntry(aktionsText, `${vorzeichenText} Stk. ${selectedQuickProduct.name} (${selectedQuickProduct.currentStock} -> ${berechneterBestand} Stk.)`);
-            
-            mengeInput.value = '';
-            closeQuickAddModal();
+                        <div class="flex space-x-2 pt-1">
+                            <button onclick="updateAuftragProgress(${a.id}, 5)" class="flex-1 py-2 bg-blue-50 text-blue-600 rounded-xl font-semibold text-xs">+5 Stk.</button>
+                            <button onclick="toggleAuftragStatus(${a.id})" class="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl font-semibold text-xs">
+                                ${a.erledigt ? 'Reaktivieren' : 'Abschließen'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            content.innerHTML = html;
+        }
+
+        function saveNewAuftrag(e) {
+            e.preventDefault();
+            const name = document.getElementById('auftrag-title').value.trim();
+            const produkt = document.getElementById('auftrag-produkt').value.trim();
+            const targetQuantity = parseInt(document.getElementById('auftrag-target').value) || 1;
+
+            const newAuftrag = {
+                id: Date.now(),
+                name,
+                produkt,
+                targetQuantity,
+                producedQuantity: 0,
+                image: selectedAuftragImageBase64,
+                erledigt: false
+            };
+
+            sampleAuftraege.unshift(newAuftrag);
+            addVerlaufEntry('Neuer Auftrag', `${name} angelegt (${targetQuantity} Stk. ${produkt})`);
+            closeAuftragModal();
+            renderAuftraege();
+        }
+
+        function updateAuftragProgress(id, add) {
+            const a = sampleAuftraege.find(item => item.id === id);
+            if (a) {
+                a.producedQuantity = Math.min(a.targetQuantity, a.producedQuantity + add);
+                if (a.producedQuantity >= a.targetQuantity) a.erledigt = true;
+                addVerlaufEntry('Auftrags-Fortschritt', `${a.name}: +${add} Stk. (Jetzt: ${a.producedQuantity}/${a.targetQuantity})`);
+                renderAuftraege();
+            }
+        }
+
+        function toggleAuftragStatus(id) {
+            const a = sampleAuftraege.find(item => item.id === id);
+            if (a) {
+                a.erledigt = !a.erledigt;
+                addVerlaufEntry('Auftrags-Status', `${a.name} ist nun ${a.erledigt ? 'Erledigt' : 'Aktiv'}`);
+                renderAuftraege();
+            }
+        }
+
+        // --- REKLAMATIONEN PORTAL ---
+        function openReklamationsPortal() {
+            document.getElementById('header-title').innerText = "Reklamationen";
+            renderReklamationen();
+        }
+
+        function renderReklamationen() {
+            const content = document.getElementById('content-list');
+            if (sampleReklamationen.length === 0) {
+                content.innerHTML = '<div class="text-center text-gray-400 py-16 text-sm font-medium">Keine Reklamationen vorhanden.</div>';
+                return;
+            }
+
+            let html = '<div class="space-y-3">';
+            sampleReklamationen.forEach(r => {
+                html += `
+                    <div class="bg-white p-4 rounded-3xl border border-gray-200/60 shadow-sm space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-sm text-gray-900">${r.name}</h3>
+                                <p class="text-xs text-amber-700 font-semibold mt-0.5">${r.produkt}</p>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                ${r.status}
+                            </span>
+                        </div>
+
+                        <p class="text-xs text-gray-600 bg-gray-50 p-3 rounded-2xl border border-gray-100">${r.grund}</p>
+
+                        ${r.image ? `<img src="${r.image}" class="w-full h-36 object-cover rounded-2xl border border-gray-100">` : ''}
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            content.innerHTML = html;
+        }
+
+        function saveNewRekla(e) {
+            e.preventDefault();
+            const name = document.getElementById('rekla-title').value.trim();
+            const produkt = document.getElementById('rekla-produkt').value.trim();
+            const grund = document.getElementById('rekla-grund').value.trim();
+
+            const newRekla = {
+                id: Date.now(),
+                name,
+                produkt,
+                grund,
+                image: selectedReklaImageBase64,
+                status: "Offen"
+            };
+
+            sampleReklamationen.unshift(newRekla);
+            addVerlaufEntry('Neue Reklamation', `${name} gemeldet für ${produkt}`);
+            closeReklaModal();
+            renderReklamationen();
+        }
+
+        // --- MITARBEITER / TEAM ---
+        async function renderTeamScreen() {
+            const content = document.getElementById('content-list');
+            content.innerHTML = '<div class="text-center text-gray-400 py-16 text-sm font-medium">Lade Team & Verlauf...</div>';
+
+            await fetchVerlauf();
+
+            const { data: profiles } = await db.from('profiles').select('*');
+
+            let html = `
+                <div class="space-y-4">
+                    <button onclick="openVerlaufModal()" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-semibold rounded-2xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center space-x-2 text-xs">
+                        <i data-lucide="history" class="w-4 h-4"></i>
+                        <span>Gesamten Aktivitäten-Verlauf öffnen</span>
+                    </button>
+
+                    <div class="bg-white p-4 rounded-3xl border border-gray-200/60 shadow-sm space-y-3">
+                        <h3 class="font-bold text-xs text-gray-400 uppercase tracking-wider">Registrierte Teammitglieder</h3>
+                        <div class="space-y-2">
+            `;
+
+            if (profiles && profiles.length > 0) {
+                profiles.forEach(p => {
+                    html += `
+                        <div class="flex items-center space-x-3 p-2.5 rounded-2xl bg-gray-50 border border-gray-100">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-xs">
+                                ${p.email ? p.email.charAt(0).toUpperCase() : 'U'}
+                            </div>
+                            <span class="text-xs font-semibold text-gray-800 truncate">${p.email}</span>
+                        </div>
+                    `;
+                });
+            } else {
+                html += `<div class="flex items-center space-x-3 p-2.5 rounded-2xl bg-gray-50 border border-gray-100">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-xs">
+                        ${currentUser ? currentUser.email.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    <span class="text-xs font-semibold text-gray-800 truncate">${currentUser ? currentUser.email : ''}</span>
+                </div>`;
+            }
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function openVerlaufModal() {
+            const list = document.getElementById('verlauf-list');
+            if (globalVerlauf.length === 0) {
+                list.innerHTML = '<div class="text-center text-xs text-gray-400 py-8">Noch keine Aktivitäten protokolliert.</div>';
+            } else {
+                let html = '';
+                globalVerlauf.forEach(v => {
+                    html += `
+                        <div class="p-3 bg-gray-50 rounded-2xl border border-gray-100 space-y-1">
+                            <div class="flex justify-between items-center text-[10px] text-gray-400 font-medium">
+                                <span class="text-blue-600 font-bold">${v.user_email}</span>
+                                <span>${v.timestamp || ''}</span>
+                            </div>
+                            <div class="text-xs font-bold text-gray-900">${v.action}</div>
+                            <div class="text-[11px] text-gray-600">${v.details}</div>
+                        </div>
+                    `;
+                });
+                list.innerHTML = html;
+            }
+            document.getElementById('verlauf-modal').classList.remove('hidden');
+        }
+
+        function closeVerlaufModal() {
+            document.getElementById('verlauf-modal').classList.add('hidden');
         }
     </script>
 </body>
