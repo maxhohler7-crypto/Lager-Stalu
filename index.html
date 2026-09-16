@@ -181,7 +181,7 @@
             </div>
             <form onsubmit="saveNewProduct(event)" class="space-y-3">
                 <input type="text" id="new-prod-name" placeholder="Produktname" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="text" id="new-prod-box" placeholder="Kiste / Kategorie (z.B. Flexblende)" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="new-prod-box" placeholder="Kiste / Kategorie (Optional, z.B. Flexblende)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <div class="flex space-x-2">
                     <input type="number" id="new-prod-stock" placeholder="Anfangsbestand" required class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="new-prod-min" placeholder="Mindestbestand" value="5" class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -547,7 +547,7 @@
         async function saveNewProduct(e) {
             e.preventDefault();
             const name = document.getElementById('new-prod-name').value;
-            const category = document.getElementById('new-prod-box').value;
+            const category = document.getElementById('new-prod-box').value || 'Allgemein';
             const stock = parseInt(document.getElementById('new-prod-stock').value) || 0;
             const min_stock = parseInt(document.getElementById('new-prod-min').value) || 5;
             const barcode = document.getElementById('new-prod-barcode').value;
