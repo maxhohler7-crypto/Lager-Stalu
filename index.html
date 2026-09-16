@@ -145,7 +145,7 @@
         </div>
     </div>
 
-    <!-- Modal: Kisten-Schnellbuchung (Z.B. -10 oder +10 Sets auf einmal) -->
+    <!-- Modal: Kisten-Schnellbuchung -->
     <div id="box-booking-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -181,7 +181,7 @@
             </div>
             <form onsubmit="saveNewProduct(event)" class="space-y-3">
                 <input type="text" id="new-prod-name" placeholder="Produktname" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="text" id="new-prod-box" placeholder="Kiste / Kategorie (Optional, z.B. Flexblende)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="new-prod-box" placeholder="Kiste / Kategorie (z.B. Flexblende)" class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <div class="flex space-x-2">
                     <input type="number" id="new-prod-stock" placeholder="Anfangsbestand" required class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="new-prod-min" placeholder="Mindestbestand" value="5" class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -317,7 +317,7 @@
 
     <script>
         let allProducts = [];
-        let boxRecipes = {}; // Speichert die Rezepturen (z.B. { "Flexblende": { "Drahtseil": 5, "Schrauben": 10 } })
+        let boxRecipes = {};
         
         let sampleAuftraege = [
             { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", targetQuantity: 50, producedQuantity: 10, image: "", erledigt: false }
@@ -356,7 +356,6 @@
             });
         };
 
-        // --- LOCAL STORAGE REZEPTUREN ---
         function loadRecipesFromStorage() {
             try {
                 const stored = localStorage.getItem('lager_box_recipes');
@@ -368,7 +367,6 @@
             localStorage.setItem('lager_box_recipes', JSON.stringify(boxRecipes));
         }
 
-        // --- VERLAUFS-LOGIK ---
         function loadVerlaufFromStorage() {
             try {
                 const stored = localStorage.getItem('lager_verlauf_backup');
@@ -524,6 +522,16 @@
 
         function handlePlusButtonClick() {
             if (currentTab === 'lager') {
+                const boxInput = document.getElementById('new-prod-box');
+                if (activeBox) {
+                    boxInput.value = activeBox;
+                    boxInput.disabled = true;
+                    boxInput.classList.add('bg-gray-200/70', 'cursor-not-allowed');
+                } else {
+                    boxInput.value = '';
+                    boxInput.disabled = false;
+                    boxInput.classList.remove('bg-gray-200/70', 'cursor-not-allowed');
+                }
                 document.getElementById('add-product-modal').classList.remove('hidden');
             } else if (currentTab === 'auftraege') {
                 document.getElementById('add-auftrag-modal').classList.remove('hidden');
@@ -532,7 +540,12 @@
             }
         }
 
-        function closeProductModal() { document.getElementById('add-product-modal').classList.add('hidden'); }
+        function closeProductModal() { 
+            document.getElementById('add-product-modal').classList.add('hidden'); 
+            const boxInput = document.getElementById('new-prod-box');
+            boxInput.disabled = false;
+            boxInput.classList.remove('bg-gray-200/70', 'cursor-not-allowed');
+        }
         function closeAuftragModal() { 
             document.getElementById('add-auftrag-modal').classList.add('hidden'); 
             selectedAuftragImageBase64 = "";
@@ -547,7 +560,8 @@
         async function saveNewProduct(e) {
             e.preventDefault();
             const name = document.getElementById('new-prod-name').value;
-            const category = document.getElementById('new-prod-box').value || 'Allgemein';
+            const categoryInput = document.getElementById('new-prod-box').value.trim();
+            const category = categoryInput || (activeBox ? activeBox : 'Allgemein');
             const stock = parseInt(document.getElementById('new-prod-stock').value) || 0;
             const min_stock = parseInt(document.getElementById('new-prod-min').value) || 5;
             const barcode = document.getElementById('new-prod-barcode').value;
@@ -557,6 +571,9 @@
             else {
                 addVerlaufEntry("Neues Produkt erstellt", `"${name}" (${stock} Stk.) in Kiste "${category}"`);
                 closeProductModal();
+                document.getElementById('new-prod-name').value = '';
+                document.getElementById('new-prod-stock').value = '';
+                document.getElementById('new-prod-barcode').value = '';
                 fetchProducts();
             }
         }
@@ -607,7 +624,6 @@
             return (p.stock ?? 0) <= min;
         }
 
-        // --- LAGER TAB & KISTEN-STÜCKLISTEN ---
         async function fetchProducts() {
             const { data, error } = await db.from('products').select('*');
             if (error) console.error(error);
@@ -709,7 +725,7 @@
             `;
 
             if (boxProducts.length === 0) {
-                html += `<div class="text-center text-gray-400 py-16 text-sm font-medium">Diese Kiste ist leer.</div>`;
+                html += `<div class="text-center text-gray-400 py-16 text-sm font-medium">Diese Kiste ist leer. Tippe oben auf "+", um ein Produkt hinzuzufügen.</div>`;
             } else {
                 html += boxProducts.map(p => {
                     const isLow = isProductLow(p);
@@ -758,7 +774,6 @@
             lucide.createIcons();
         }
 
-        // --- KISTEN-STÜCKLISTE MODALS ---
         function openBoxConfigModal(boxName) {
             configBoxName = boxName;
             document.getElementById('config-box-title').innerText = `Set: ${boxName}`;
@@ -771,7 +786,7 @@
             } else {
                 const recipe = boxRecipes[boxName] || {};
                 list.innerHTML = boxProds.map(p => {
-                    const currentQty = recipe[p.name] !== undefined ? recipe[p.name] : 1; // Standard: 1 Stk. pro Set
+                    const currentQty = recipe[p.name] !== undefined ? recipe[p.name] : 1;
                     return `
                         <div class="flex items-center justify-between bg-gray-50 p-3 rounded-2xl border border-gray-100">
                             <div>
@@ -862,7 +877,6 @@
             fetchProducts();
         }
 
-        // --- AUFTRAGS-PORTAL ---
         function openAuftragsPortal(filterProduktName = null) {
             document.getElementById('header-title').innerText = "Auftrags-Portal";
             document.getElementById('back-btn').classList.remove('hidden');
@@ -952,7 +966,6 @@
             openAuftragsPortal();
         }
 
-        // --- REKLAMATIONS-PORTAL ---
         function openReklamationsPortal(filterProduktName = null) {
             document.getElementById('header-title').innerText = "Reklamations-Portal";
             document.getElementById('back-btn').classList.remove('hidden');
@@ -1001,7 +1014,6 @@
             lucide.createIcons();
         }
 
-        // --- TEAM TAB ---
         async function renderTeamScreen() {
             const list = document.getElementById('content-list');
             const { data: profiles } = await db.from('profiles').select('*');
@@ -1048,7 +1060,6 @@
             lucide.createIcons();
         }
 
-        // --- VERLAUFS-PORTAL MODAL LOGIK ---
         async function openVerlaufModal() {
             await fetchVerlauf();
             renderVerlaufList();
@@ -1109,7 +1120,6 @@
             }
         }
 
-        // --- BARCODE SCANNER LOGIK ---
         function startScanner() {
             document.getElementById('scanner-container').classList.remove('hidden');
             document.getElementById('start-scan-btn').classList.add('hidden');
