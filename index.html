@@ -111,7 +111,7 @@
                 <div class="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-3 rounded-full shadow-lg shadow-blue-500/40 border-4 border-gray-100 flex items-center justify-center">
                     <i data-lucide="scan-barcode" class="w-5 h-5"></i>
                 </div>
-                <span class="text-[10px] font-bold text-blue-600 mt-1">Eingang</span>
+                <span class="text-[10px] font-bold text-blue-600 mt-1">Buchen</span>
             </button>
 
             <button id="tab-reklamationen" onclick="switchTab('reklamationen')" class="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-all active:scale-95 w-14">
@@ -200,13 +200,13 @@
         </div>
     </div>
 
-    <!-- Modal 4: Wareneingang & Barcode Scanner -->
+    <!-- Modal 4: Schnellbuchung (Wareneingang & Warenausgang) -->
     <div id="quick-add-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 transition-all">
         <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center pb-1 border-b border-gray-100">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-900">Wareneingang</h3>
-                    <p class="text-xs text-gray-400">Scannen oder manuell auswählen</p>
+                    <h3 class="text-lg font-bold text-gray-900">Schnellbuchung</h3>
+                    <p class="text-xs text-gray-400">Scannen oder Produkt wählen</p>
                 </div>
                 <button onclick="closeQuickAddModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
@@ -235,11 +235,16 @@
                         <div id="selected-product-stock"></div>
                     </div>
                 </div>
-                <div class="flex space-x-2">
-                    <input type="number" id="quick-quantity" placeholder="+ Menge (z.B. 100)" class="flex-1 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
-                    <button onclick="submitQuickBooking()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold rounded-xl text-sm shadow-md shadow-blue-500/20 transition-all">
-                        Buchen
-                    </button>
+                <div>
+                    <label id="booking-type-label" class="block text-[11px] font-semibold text-gray-500 mb-1">
+                        Menge eintragen (z. B. 100 für Eingang oder -100 für Ausgang)
+                    </label>
+                    <div class="flex space-x-2">
+                        <input type="number" id="quick-quantity" oninput="updateBookingLabel(this.value)" placeholder="Menge (z.B. +100 oder -100)" class="flex-1 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+                        <button onclick="submitQuickBooking()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold rounded-xl text-sm shadow-md shadow-blue-500/20 transition-all">
+                            Buchen
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -326,7 +331,6 @@
             globalVerlauf.unshift(newEntry);
             localStorage.setItem('lager_verlauf_backup', JSON.stringify(globalVerlauf));
 
-            // Versuche Supabase-Datenbank-Speicherung
             try {
                 await db.from('history').insert([{
                     user_email: userEmail,
@@ -454,7 +458,6 @@
             }
         }
 
-        // --- ZURÜCK-BUTTON FUNKTION ---
         function showBoxOverview() {
             switchTab('lager');
         }
@@ -898,7 +901,7 @@
         }
 
         async function updateStockByName(prodName, newStock) {
-            if (newStock < 0) return;
+            if (newStock < 0) newStock = 0; // Verhindert negativen Gesamtbestand im Lager
             
             const prod = allProducts.find(p => p.name === prodName);
             const oldStock = prod ? prod.stock : '?';
@@ -969,6 +972,7 @@
             selectedQuickProduct = null;
             document.getElementById('quick-booking-form').classList.add('hidden');
             document.getElementById('quick-search').value = '';
+            document.getElementById('quick-quantity').value = '';
             filterQuickAddList();
             document.getElementById('quick-add-modal').classList.remove('hidden');
         }
@@ -1022,20 +1026,41 @@
             document.getElementById('selected-product-name').innerText = name;
             document.getElementById('selected-product-stock').innerText = `Aktueller Bestand: ${currentStock}`;
             document.getElementById('quick-booking-form').classList.remove('hidden');
+            document.getElementById('quick-quantity').value = '';
+            updateBookingLabel('');
+        }
+
+        function updateBookingLabel(val) {
+            const label = document.getElementById('booking-type-label');
+            const num = parseInt(val);
+            
+            if (!isNaN(num) && num < 0) {
+                label.innerHTML = `<span class="text-red-600 font-bold">Warenausgang (Abbuchen):</span> ${Math.abs(num)} Stk. werden abgezogen`;
+            } else if (!isNaN(num) && num > 0) {
+                label.innerHTML = `<span class="text-emerald-600 font-bold">Wareneingang (Zubuchen):</span> +${num} Stk. werden hinzugefügt`;
+            } else {
+                label.innerText = "Menge eintragen (z. B. 100 für Eingang oder -100 für Ausgang)";
+            }
         }
 
         async function submitQuickBooking() {
             const mengeInput = document.getElementById('quick-quantity');
             const menge = parseInt(mengeInput.value);
 
-            if (isNaN(menge) || menge <= 0 || !selectedQuickProduct) {
-                alert("Bitte gib eine gültige Menge ein.");
+            if (isNaN(menge) || menge === 0 || !selectedQuickProduct) {
+                alert("Bitte gib eine gültige Zahl ungleich 0 ein (z. B. 50 oder -50).");
                 return;
             }
 
             const neuerBestand = selectedQuickProduct.currentStock + menge;
-            await updateStockByName(selectedQuickProduct.name, neuerBestand);
-            addVerlaufEntry("Wareneingang gebucht", `+${menge} Stk. ${selectedQuickProduct.name} (${selectedQuickProduct.currentStock} -> ${neuerBestand} Stk.)`);
+            const berechneterBestand = neuerBestand < 0 ? 0 : neuerBestand;
+
+            await updateStockByName(selectedQuickProduct.name, berechneterBestand);
+
+            const aktionsText = menge > 0 ? "Wareneingang gebucht" : "Warenausgang gebucht";
+            const vorzeichenText = menge > 0 ? `+${menge}` : `${menge}`;
+
+            addVerlaufEntry(aktionsText, `${vorzeichenText} Stk. ${selectedQuickProduct.name} (${selectedQuickProduct.currentStock} -> ${berechneterBestand} Stk.)`);
             
             mengeInput.value = '';
             closeQuickAddModal();
