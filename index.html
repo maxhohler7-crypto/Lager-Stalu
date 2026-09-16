@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LagerManager</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- HTML5 Barcode/QR Code Scanner Library -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body {
@@ -126,7 +124,55 @@
         </nav>
     </div>
 
-    <!-- Modal 1: Produkt hinzufügen (Lager) -->
+    <!-- Modal: Kisten-Set Konfigurator (Rezeptur festlegen) -->
+    <div id="box-config-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900" id="config-box-title">Set-Stückliste</h3>
+                    <p class="text-xs text-gray-400">Verbrauch pro 1 Baugruppe / Set</p>
+                </div>
+                <button onclick="closeBoxConfigModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <p class="text-xs text-gray-500">Gib an, wie viele Einheiten der Produkte verbraucht werden, wenn 1 Set aus dieser Kiste entnommen wird:</p>
+
+            <div id="config-products-list" class="flex-1 overflow-y-auto space-y-3 pr-1 my-2"></div>
+
+            <button onclick="saveBoxRecipe()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-blue-500/20 transition-all">
+                Rezeptur Speichern
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal: Kisten-Schnellbuchung (Z.B. -10 oder +10 Sets auf einmal) -->
+    <div id="box-booking-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900" id="box-booking-title">Kisten-Set buchen</h3>
+                    <p class="text-xs text-gray-400">Ganze Sets abbuchen oder zubuchen</p>
+                </div>
+                <button onclick="closeBoxBookingModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Anzahl der Sets (z.B. -10 für Abbuchen oder +10)</label>
+                <input type="number" id="box-booking-amount" placeholder="z. B. -10 oder 10" class="w-full px-4 py-3 rounded-xl bg-gray-100 border border-gray-200 text-sm font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="flex space-x-2">
+                <button onclick="submitBoxBooking(-1)" class="flex-1 py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-all">-1 Set</button>
+                <button onclick="submitBoxBooking(1)" class="flex-1 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold rounded-xl text-xs transition-all">+1 Set</button>
+            </div>
+
+            <button onclick="submitBoxBookingCustom()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow-md transition-all">
+                Eingegebene Set-Anzahl buchen
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal 1: Produkt hinzufügen -->
     <div id="add-product-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -135,7 +181,7 @@
             </div>
             <form onsubmit="saveNewProduct(event)" class="space-y-3">
                 <input type="text" id="new-prod-name" placeholder="Produktname" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="text" id="new-prod-box" placeholder="Kiste / Kategorie (z.B. Kiste A)" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="new-prod-box" placeholder="Kiste / Kategorie (z.B. Flexblende)" required class="w-full px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <div class="flex space-x-2">
                     <input type="number" id="new-prod-stock" placeholder="Anfangsbestand" required class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="number" id="new-prod-min" placeholder="Mindestbestand" value="5" class="w-1/2 px-4 py-2.5 rounded-xl bg-gray-100 border border-gray-200 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -200,7 +246,7 @@
         </div>
     </div>
 
-    <!-- Modal 4: Schnellbuchung (Wareneingang & Warenausgang) -->
+    <!-- Modal 4: Schnellbuchung (Barcode & Suche) -->
     <div id="quick-add-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 transition-all">
         <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-gray-100 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center pb-1 border-b border-gray-100">
@@ -271,6 +317,7 @@
 
     <script>
         let allProducts = [];
+        let boxRecipes = {}; // Speichert die Rezepturen (z.B. { "Flexblende": { "Drahtseil": 5, "Schrauben": 10 } })
         
         let sampleAuftraege = [
             { id: 101, name: "Auftrag #A-101", produkt: "Musterprodukt A", targetQuantity: 50, producedQuantity: 10, image: "", erledigt: false }
@@ -284,6 +331,8 @@
 
         let authMode = 'login';
         let activeBox = null;
+        let configBoxName = null;
+        let bookingBoxName = null;
         let currentTab = 'lager';
         let currentUser = null;
         let selectedQuickProduct = null;
@@ -296,6 +345,7 @@
             lucide.createIcons();
             setupImageUploadListeners();
             loadVerlaufFromStorage();
+            loadRecipesFromStorage();
 
             const { data: { session } } = await db.auth.getSession();
             if (session) showApp(session.user);
@@ -306,7 +356,19 @@
             });
         };
 
-        // --- VERLAUFS-LOGIK (Supabase + LocalStorage Backup) ---
+        // --- LOCAL STORAGE REZEPTUREN ---
+        function loadRecipesFromStorage() {
+            try {
+                const stored = localStorage.getItem('lager_box_recipes');
+                if (stored) boxRecipes = JSON.parse(stored);
+            } catch(e) {}
+        }
+
+        function saveRecipesToStorage() {
+            localStorage.setItem('lager_box_recipes', JSON.stringify(boxRecipes));
+        }
+
+        // --- VERLAUFS-LOGIK ---
         function loadVerlaufFromStorage() {
             try {
                 const stored = localStorage.getItem('lager_verlauf_backup');
@@ -338,9 +400,7 @@
                     details: details,
                     timestamp: `${dateStr} um ${timeStr}`
                 }]);
-            } catch(err) {
-                console.log("Hinweis: Supabase history Tabelle nicht aktiv, Speicher in lokalem Verlauf.");
-            }
+            } catch(err) {}
         }
 
         async function fetchVerlauf() {
@@ -547,7 +607,7 @@
             return (p.stock ?? 0) <= min;
         }
 
-        // --- LAGER TAB ---
+        // --- LAGER TAB & KISTEN-STÜCKLISTEN ---
         async function fetchProducts() {
             const { data, error } = await db.from('products').select('*');
             if (error) console.error(error);
@@ -593,9 +653,9 @@
                 const hasLowStock = boxProds.some(p => isProductLow(p));
 
                 return `
-                    <div onclick="openBox('${boxName}')" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md active:scale-98 transition-all cursor-pointer flex items-center justify-between">
-                        <div class="flex items-center space-x-3.5">
-                            <div class="w-12 h-12 rounded-2xl ${hasLowStock ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'} flex items-center justify-center">
+                    <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex items-center justify-between">
+                        <div onclick="openBox('${boxName}')" class="flex items-center space-x-3.5 flex-1 cursor-pointer">
+                            <div class="w-12 h-12 rounded-2xl ${hasLowStock ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'} flex items-center justify-center shrink-0">
                                 <i data-lucide="archive" class="w-6 h-6"></i>
                             </div>
                             <div>
@@ -604,8 +664,12 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
-                            ${hasLowStock ? '<span class="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse"></span>' : ''}
-                            <i data-lucide="chevron-right" class="w-5 h-5 text-gray-300"></i>
+                            <button onclick="openBoxBookingModal('${boxName}')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-xl text-xs active:scale-95 transition-all">
+                                Set buchen
+                            </button>
+                            <button onclick="openBoxConfigModal('${boxName}')" class="w-9 h-9 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center active:scale-90 transition-all">
+                                <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                            </button>
                         </div>
                     </div>
                 `;
@@ -625,54 +689,177 @@
             const list = document.getElementById('content-list');
             const boxProducts = allProducts.filter(p => (p.category || 'Allgemein') === boxName);
 
+            let html = `
+                <div class="bg-blue-50/60 p-4 rounded-3xl border border-blue-100 space-y-3 mb-2">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-blue-900 text-sm">Ganzes Set buchen: "${boxName}"</h4>
+                            <p class="text-[11px] text-blue-600">Bucht alle Einzelprodukte dieser Kiste gebündelt ab/zu</p>
+                        </div>
+                        <button onclick="openBoxConfigModal('${boxName}')" class="p-2 bg-white rounded-xl text-blue-600 shadow-sm hover:bg-blue-50 active:scale-90 transition-all">
+                            <i data-lucide="settings" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="openBoxBookingModal('${boxName}')" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 transition-all">
+                            Set Mengen-Buchung (+ / -)
+                        </button>
+                    </div>
+                </div>
+            `;
+
             if (boxProducts.length === 0) {
-                list.innerHTML = `<div class="text-center text-gray-400 py-16 text-sm font-medium">Diese Kiste ist leer.</div>`;
-                return;
-            }
+                html += `<div class="text-center text-gray-400 py-16 text-sm font-medium">Diese Kiste ist leer.</div>`;
+            } else {
+                html += boxProducts.map(p => {
+                    const isLow = isProductLow(p);
+                    const min = p.min_stock ?? 5;
 
-            list.innerHTML = boxProducts.map(p => {
-                const isLow = isProductLow(p);
-                const min = p.min_stock ?? 5;
-
-                return `
-                    <div class="bg-white p-4 rounded-3xl shadow-sm border ${isLow ? 'border-amber-300 bg-amber-50/20' : 'border-gray-100'} flex flex-col space-y-3">
-                        <div class="flex items-center justify-between">
-                            <div>
+                    return `
+                        <div class="bg-white p-4 rounded-3xl shadow-sm border ${isLow ? 'border-amber-300 bg-amber-50/20' : 'border-gray-100'} flex flex-col space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        <h4 class="font-bold text-gray-900 text-sm">${p.name}</h4>
+                                        ${isLow ? '<span class="text-[10px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Gering</span>' : ''}
+                                    </div>
+                                    <p class="text-xs text-gray-400 font-medium mt-0.5">
+                                        Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span>
+                                        <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
+                                    </p>
+                                </div>
                                 <div class="flex items-center space-x-2">
-                                    <h4 class="font-bold text-gray-900 text-sm">${p.name}</h4>
-                                    ${isLow ? '<span class="text-[10px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Gering</span>' : ''}
+                                    <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
+                                        <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
+                                        <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
+                                    </div>
+                                    <button onclick="deleteProduct('${p.id}', '${p.name}')" class="w-9 h-9 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all flex items-center justify-center ml-1">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
                                 </div>
-                                <p class="text-xs text-gray-400 font-medium mt-0.5">
-                                    Bestand: <span class="font-bold ${isLow ? 'text-amber-600' : 'text-gray-700'}">${p.stock ?? 0}</span>
-                                    <span class="text-[10px] text-gray-400 ml-1">(Min: ${min})</span>
-                                </p>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                <div class="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-2xl">
-                                    <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) - 1})" class="w-8 h-8 rounded-xl bg-white text-gray-700 font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">-</button>
-                                    <button onclick="updateStockByName('${p.name}', ${(p.stock ?? 0) + 1})" class="w-8 h-8 rounded-xl bg-blue-600 text-white font-bold text-base shadow-sm active:scale-90 transition-all flex items-center justify-center">+</button>
-                                </div>
-                                <button onclick="deleteProduct('${p.id}', '${p.name}')" class="w-9 h-9 rounded-2xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all flex items-center justify-center ml-1">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+
+                            <div class="pt-2 border-t border-gray-100 flex space-x-2">
+                                <button onclick="openReklamationsPortal('${p.name}')" class="flex-1 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 transition-all">
+                                    <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                                    <span>Reklamation</span>
+                                </button>
+                                <button onclick="openAuftragsPortal('${p.name}')" class="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 transition-all">
+                                    <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
+                                    <span>Auftrag</span>
                                 </button>
                             </div>
                         </div>
+                    `;
+                }).join('');
+            }
 
-                        <div class="pt-2 border-t border-gray-100 flex space-x-2">
-                            <button onclick="openReklamationsPortal('${p.name}')" class="flex-1 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 transition-all">
-                                <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
-                                <span>Reklamations-Portal</span>
-                            </button>
-                            <button onclick="openAuftragsPortal('${p.name}')" class="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 transition-all">
-                                <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
-                                <span>Auftrags-Portal</span>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
+            list.innerHTML = html;
             lucide.createIcons();
+        }
+
+        // --- KISTEN-STÜCKLISTE MODALS ---
+        function openBoxConfigModal(boxName) {
+            configBoxName = boxName;
+            document.getElementById('config-box-title').innerText = `Set: ${boxName}`;
+            
+            const list = document.getElementById('config-products-list');
+            const boxProds = allProducts.filter(p => (p.category || 'Allgemein') === boxName);
+
+            if (boxProds.length === 0) {
+                list.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">Keine Produkte in dieser Kiste.</div>`;
+            } else {
+                const recipe = boxRecipes[boxName] || {};
+                list.innerHTML = boxProds.map(p => {
+                    const currentQty = recipe[p.name] !== undefined ? recipe[p.name] : 1; // Standard: 1 Stk. pro Set
+                    return `
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                            <div>
+                                <h5 class="font-bold text-xs text-gray-900">${p.name}</h5>
+                                <p class="text-[10px] text-gray-400">Aktueller Lagerbestand: ${p.stock ?? 0}</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="recipe-qty-${p.name}" value="${currentQty}" min="0" class="w-16 px-2 py-1.5 rounded-xl border border-gray-200 text-center font-bold text-xs bg-white">
+                                <span class="text-xs font-semibold text-gray-500">Stk.</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            document.getElementById('box-config-modal').classList.remove('hidden');
+        }
+
+        function closeBoxConfigModal() {
+            document.getElementById('box-config-modal').classList.add('hidden');
+        }
+
+        function saveBoxRecipe() {
+            if (!configBoxName) return;
+            const boxProds = allProducts.filter(p => (p.category || 'Allgemein') === configBoxName);
+            
+            if (!boxRecipes[configBoxName]) boxRecipes[configBoxName] = {};
+
+            boxProds.forEach(p => {
+                const input = document.getElementById(`recipe-qty-${p.name}`);
+                if (input) {
+                    boxRecipes[configBoxName][p.name] = parseInt(input.value) || 0;
+                }
+            });
+
+            saveRecipesToStorage();
+            addVerlaufEntry("Set-Stückliste geändert", `Rezeptur für Kiste "${configBoxName}" angepasst`);
+            closeBoxConfigModal();
+            alert(`Stückliste für "${configBoxName}" wurde erfolgreich gespeichert!`);
+        }
+
+        function openBoxBookingModal(boxName) {
+            bookingBoxName = boxName;
+            document.getElementById('box-booking-title').innerText = `Set Buchen: ${boxName}`;
+            document.getElementById('box-booking-amount').value = '';
+            document.getElementById('box-booking-modal').classList.remove('hidden');
+        }
+
+        function closeBoxBookingModal() {
+            document.getElementById('box-booking-modal').classList.add('hidden');
+        }
+
+        function submitBoxBookingCustom() {
+            const val = parseInt(document.getElementById('box-booking-amount').value);
+            if (isNaN(val) || val === 0) {
+                alert("Bitte gib eine gültige Anzahl ein (z. B. -10 oder 10).");
+                return;
+            }
+            submitBoxBooking(val);
+        }
+
+        async function submitBoxBooking(setMultiplier) {
+            if (!bookingBoxName) return;
+
+            const boxProds = allProducts.filter(p => (p.category || 'Allgemein') === bookingBoxName);
+            const recipe = boxRecipes[bookingBoxName] || {};
+
+            if (boxProds.length === 0) {
+                alert("In dieser Kiste befinden sich keine Produkte.");
+                return;
+            }
+
+            let summaryDetails = [];
+
+            for (const p of boxProds) {
+                const qtyPerSet = recipe[p.name] !== undefined ? recipe[p.name] : 1;
+                const totalChange = qtyPerSet * setMultiplier;
+                const newStock = Math.max(0, (p.stock ?? 0) + totalChange);
+
+                await db.from('products').update({ stock: newStock }).eq('name', p.name);
+                summaryDetails.push(`${p.name}: ${p.stock ?? 0} -> ${newStock}`);
+            }
+
+            const actionName = setMultiplier < 0 ? "Set-Warenausgang" : "Set-Wareneingang";
+            addVerlaufEntry(actionName, `${setMultiplier > 0 ? '+' : ''}${setMultiplier}x Set "${bookingBoxName}" gebucht (${summaryDetails.join(', ')})`);
+
+            closeBoxBookingModal();
+            fetchProducts();
         }
 
         // --- AUFTRAGS-PORTAL ---
@@ -817,18 +1004,15 @@
         // --- TEAM TAB ---
         async function renderTeamScreen() {
             const list = document.getElementById('content-list');
-            
             const { data: profiles } = await db.from('profiles').select('*');
 
             let html = `
                 <div class="space-y-4">
-                    <!-- Verlauf Button -->
                     <button onclick="openVerlaufModal()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-3xl shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 active:scale-98 transition-all">
                         <i data-lucide="history" class="w-5 h-5"></i>
                         <span>Verlaufs-Portal öffnen</span>
                     </button>
 
-                    <!-- Mitarbeiter Liste -->
                     <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 space-y-3">
                         <h3 class="font-bold text-gray-900 text-sm border-b border-gray-100 pb-2">Registriertes Team</h3>
             `;
@@ -901,7 +1085,7 @@
         }
 
         async function updateStockByName(prodName, newStock) {
-            if (newStock < 0) newStock = 0; // Verhindert negativen Gesamtbestand im Lager
+            if (newStock < 0) newStock = 0;
             
             const prod = allProducts.find(p => p.name === prodName);
             const oldStock = prod ? prod.stock : '?';
